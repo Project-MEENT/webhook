@@ -45,19 +45,55 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
 
             case 'POST':
                 // Receive incoming data
+                $input = file_get_contents('php://input');
 
                 // Check Authentication
 
                 // @TODO: Convert to Linked-Data once ontology is decided upon
+                if (empty($input)) {
+                    // @TODO: Validate that the incoming data format and content is correct.
+                    // For now, we'll accept any data that is not empty.
+                    // Later on actual validation of the incoming data will be needed
+                    // (otherwise we cannot convert it to Linked Data.
+                    $response['body'] = [
+                        'type' => $uriRoot . '/errors/',
+                        'title' => 'No data received',
+                        'errors' => [
+                            [
+                                'detail' => 'No data received',
+                                'pointer' => '#no-data-received',
+                            ],
+                        ],
+                    ];
+                    $response['headers']['Content-Type'] = 'application/problem+json';
+                    $response['status'] = 422;
+                    break;
+                }
+
+                try {
+                    $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
+                } catch (JsonException $e) {
+                    // Data is not JSON, write as-is
+                    $data = $input;
+                }
+
 
                 // Check which Solid Pod to write to
 
                 // Connect to Solid Pod (using ? see Solid Specs)
 
                 // Write data to Solid Pod (@TODO: Decide on path / resource container)
+
+                // Return success
+                $response['body'] = [
+                    'type' => $uriRoot,
+                    /* @TODO: Add link to URL on Solid Pod . ''*/
+                    'title' => 'Records written',
+                    'data' => $data,
+                ];
+                $response['status'] = 201;
                 break;
         }
-
         break;
 }
 
@@ -83,7 +119,7 @@ $body = $response['body'];
 try {
     $body = json_encode($body, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
 
-    if ($response['headers']['Content-Type'] !== 'application/problem+json') {
+    if (! isset($response['headers']['Content-Type'])) {
         $response['headers']['Content-Type'] = 'application/json';
     }
 } catch (JsonException $e) {
