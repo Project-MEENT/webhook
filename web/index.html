@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html color-mode="user" lang="en">
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://cdn.jsdelivr.net/npm/mvp.css@1.17.2/mvp.min.css" rel="stylesheet">
 <style>
     title {
         display: inline;
+    }
+    h2 {
+        width: 100%;
     }
 </style>
 <header>
@@ -14,4 +18,64 @@
         P1 dongle to write data to a Solid Pod.
     </p>
 </header>
+<main>
+    <section>
+        <h2>Request</h2>
+        <form action="/api/v0/" method="POST">
+            <p>To make it easier to develop and demo the webhook, this form is provided</p>
+            <p>
+                The form below mimics the Dongle behavior, so it is possible to show the working of the webhook without a dongle
+            </p>
+            <fieldset>
+                <legend>P1 Data</legend>
+                <label>
+                    <textarea placeholder="Dongle data goes here..." rows="20"></textarea>
+                </label>
+            </fieldset>
+            <button type="submit">Submit</button>
+        </form>
+    </section>
+    <section>
+        <h2>Response</h2>
+        <output></output>
+    </section>
+</main>
+<script>
+    const pre = document.createElement('pre')
+    const output = document.createElement('code')
+    pre.appendChild(output)
+    document.querySelector('output').insertAdjacentElement('afterbegin', pre)
+
+    document.querySelector('form').addEventListener('submit', async (event) => {
+        event.preventDefault()
+        const form = event.target
+
+        form.parentElement.style.display = 'none'
+        form.parentElement.insertAdjacentHTML('afterend', '<a href="/">← Try again</a>')
+
+        const data = form.querySelector('textarea').value
+
+        const headers = { 'Content-Type': 'application/json' }
+
+        let url = form.action || window.location.href
+
+        try {
+            const response = await fetch(url, {
+                body: data,
+                headers: headers,
+                method: form.method || 'POST',
+            })
+
+            const responseText = await response.text()
+
+            output.insertAdjacentHTML('beforeend',
+                `Status: ${response.status}:\nResponse:\n${responseText}`,
+            )
+
+            // @TODO: Check if there is an RFC9457 compliant error, if so, add link to provided URI
+        } catch (error) {
+            output.innerHTML = `Error! Could not make request: ${error.message ?? error}`
+        }
+    })
+</script>
 </html>
