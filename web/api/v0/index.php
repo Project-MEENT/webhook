@@ -144,7 +144,7 @@ JSON;
 
 http_response_code($response['status']);
 
-array_walk($response['headers'], static function (string $value, string $key) {
+array_walk($response['headers'], static function ($value, $key) {
     header("$key: $value");
 });
 
