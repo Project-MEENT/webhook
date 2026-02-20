@@ -2,6 +2,11 @@
 
 ob_start();
 
+$uriRoot = '';
+if (! empty($_SERVER['HTTP_HOST'])) {
+    $uriRoot = 'https://' . $_SERVER['HTTP_HOST'];
+}
+
 $response = [
     'body' => '',
     'headers' => [],
@@ -48,8 +53,18 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
 $output = ob_get_clean();
 
 if ($output) {
-    // Assume error
-    // @TODO: Add error handling. What should the response be?
+    $response['body'] = [
+        'type' => $uriRoot . '/errors/',
+        'title' => 'Unexpected Output',
+        'errors' => [
+            [
+                'detail' => 'The response caused unexpected output:' . htmlentities($output),
+                'pointer' => '#unexpected-output',
+            ],
+        ],
+    ];
+
+    $response['status'] = 500;
 }
 
 $body = $response['body'];
