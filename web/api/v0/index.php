@@ -52,10 +52,38 @@ if ($output) {
     // @TODO: Add error handling. What should the response be?
 }
 
+$body = $response['body'];
+
+try {
+    $body = json_encode($body, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
+
+    if ($response['headers']['Content-Type'] !== 'application/problem+json') {
+        $response['headers']['Content-Type'] = 'application/json';
+    }
+} catch (JsonException $e) {
+    $body = <<<'JSON'
+{
+    "type": "%s",
+    "title": "Response Encoding Failed",
+    "errors": [{
+        "detail": "Failed to convert response to JSON: %s",
+        "pointer": "#response-encoding-failed"
+     }]
+}
+JSON;
+
+    $response['body'] = vsprintf($body, [
+        'type' => $uriRoot . '/errors/',
+        'json-error' => $e->getMessage(),
+    ]);
+    $response['headers']['Content-Type'] = 'application/problem+json';
+    $response['status'] = 500;
+}
+
 http_response_code($response['status']);
 
 array_walk($response['headers'], function ($header) {
     header($header);
 });
 
-echo trim($response['body']);
+echo trim($body);
