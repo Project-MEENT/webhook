@@ -23,7 +23,7 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
 
             case 'HEAD':
             case 'OPTIONS':
-                $response['headers'][] = 'Access-Control-Allow-Methods: OPTIONS, HEAD, POST';
+                $response['headers']['Access-Control-Allow-Methods'] = 'OPTIONS, HEAD, POST';
                 $response['status'] = 204;
                 break;
 
@@ -82,8 +82,8 @@ JSON;
 
 http_response_code($response['status']);
 
-array_walk($response['headers'], function ($header) {
-    header($header);
+array_walk($response['headers'], static function (string $value, string $key) {
+    header("$key: $value");
 });
 
 echo trim($body);
