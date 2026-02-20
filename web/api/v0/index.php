@@ -2,6 +2,7 @@
 
 ob_start();
 
+$requestMethod = $_SERVER['REQUEST_METHOD'] ?? '';
 $uriRoot = '';
 if (! empty($_SERVER['HTTP_HOST'])) {
     $uriRoot = 'https://' . $_SERVER['HTTP_HOST'];
@@ -18,12 +19,22 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
         // @TODO: Show information about the webhook, add content negotiation
         break;
     default:
-        switch ($_SERVER['REQUEST_METHOD'] ?? '') {
+        switch ($requestMethod) {
             case 'GET':
             case 'PATCH':
             case 'PUT':
+                $response['body'] = [
+                    'type' => $uriRoot . '/errors/',
+                    'title' => 'Method not allowed',
+                    'errors' => [
+                        [
+                            'detail' => "Method $requestMethod is not allowed, MUST be POST",
+                            'pointer' => '#method-not-allowed',
+                        ],
+                    ],
+                ];
+                $response['headers']['Content-Type'] = 'application/problem+json';
                 $response['status'] = 405;
-                $response['body'] = 'Method not allowed, MUST be POST';
                 break;
 
             case 'HEAD':
