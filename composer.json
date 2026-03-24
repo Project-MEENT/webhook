@@ -1,7 +1,7 @@
 {
     "autoload": {
         "psr-4": {
-            "Meent\\Webhook\\": "src/"
+            "Meent\\WebHook\\": "src/"
         }
     },
     "config": {
