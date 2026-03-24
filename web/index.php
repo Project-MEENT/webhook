@@ -129,10 +129,7 @@ if ($outputType === 'html') {
                     JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) . '</code></pre>';
         }
 
-        $fileHandle = fopen(__FILE__, 'rb');
-        fseek($fileHandle, __COMPILER_HALT_OFFSET__);
-        $template = stream_get_contents($fileHandle);
-        fclose($fileHandle);
+        $template = file_get_contents(__DIR__ . '/../src/template.html');
 
         $content = vsprintf($template, [
             $response['title'] ?? 'Response',
@@ -169,7 +166,7 @@ if ($outputType === 'html') {
                 "pointer": "#response-encoding-failed"
              }]
         }
-        JSON;
+JSON;
 
         $content = vsprintf($body, [
             'type' => '/errors/',
