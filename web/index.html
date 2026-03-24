@@ -21,7 +21,7 @@
 <main>
     <section>
         <h2>Request</h2>
-        <form action="/api/v0/" method="POST">
+        <form action="/api/v0/data/" method="POST">
             <p>To make it easier to develop and demo the webhook, this form is provided</p>
             <p>
                 The form below mimics the Dongle behavior, so it is possible to show the working of the webhook without a dongle
@@ -72,7 +72,17 @@
                 `Status: ${response.status}:\nResponse:\n${responseText}`,
             )
 
-            // @TODO: Check if there is an RFC9457 compliant error, if so, add link to provided URI
+            try {
+                const json = JSON.parse(responseText)
+
+                // Check if there is an RFC-9457 compliant error
+                const hash = json.errors[0]?.pointer.substring(1)
+                if (hash) {
+                    output.insertAdjacentHTML('afterend', `<a href="/errors/#${hash}">See error details</a>`)
+                }
+            } catch (error) {
+                // ignore, not JSON
+            }
         } catch (error) {
             output.innerHTML = `Error! Could not make request: ${error.message ?? error}`
         }
