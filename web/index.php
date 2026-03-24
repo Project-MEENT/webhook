@@ -19,6 +19,8 @@ $response = [
 ];
 
 $path = $request->getUri()->getPath();
+$pathParts = array_values(array_filter(explode('/', $path)));
+$rootPath = $pathParts[0] ?? '';
 $requestMethod = $request->getMethod();
 
 $acceptHeader = $request->getHeaderLine('Accept');
@@ -48,77 +50,16 @@ switch ($accept[0]) {
     break;
 }
 
-switch ($path) {
-    case '/api/v0/':
-        $response['content'] = "For more information, visit $uriRoot";
-        $response['title'] = 'EnergyID Webhook';
-        $response['type'] = $uriRoot;
+switch ($rootPath) {
+    case 'api':
+        $controller = new \Meent\WebHook\Controller\ApiController();
+        $response = $controller->handleRequest($request, $response);
     break;
-    case '/api/v0/data/':
-        switch ($requestMethod) {
-            case 'GET':
-            case 'PATCH':
-            case 'PUT':
-                $response['content'] = [[
-                        'detail' => "Method $requestMethod is not allowed, MUST be POST",
-                        'pointer' => '#method-not-allowed',
-                    ],
-                ];
-                $response['status'] = 405;
-                $response['title'] = 'Method not allowed';
-                $response['type'] = '/errors/';
-            break;
 
-            case 'HEAD':
-            case 'OPTIONS':
-                $response['headers']['Access-Control-Allow-Methods'] = ['OPTIONS, HEAD, POST'];
-                $response['status'] = 204;
-            break;
-
-            case 'POST':
-                // Receive incoming data
-                $input = file_get_contents('php://input');
-
-                // Check Authentication
-
-                // @TODO: Convert to Linked-Data once ontology is decided upon
-                if (empty($input)) {
-                    // @TODO: Validate that the incoming data format and content is correct.
-                    // For now, we'll accept any data that is not empty.
-                    // Later on actual validation of the incoming data will be needed
-                    // (otherwise we cannot convert it to Linked Data.
-                    $response['content'] = [[
-                        'detail' => 'No data received',
-                        'pointer' => '#no-data-received',
-                    ]];
-                    $response['status'] = 422;
-                    $response['title'] = 'No data received';
-                    $response['type'] = '/errors/';
-                    break;
-                }
-
-                try {
-                    $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
-                } catch (JsonException $e) {
-                    // Data is not JSON, write as-is
-                    $data = $input;
-                }
-
-
-                // Check which Solid Pod to write to
-
-                // Connect to Solid Pod (using ? see Solid Specs)
-
-                // Write data to Solid Pod (@TODO: Decide on path / resource container)
-
-                // Return success
-                /* @TODO: Add link to URL on Solid Pod . '' */
-                $response['content'] = $data;
-                $response['status'] = 201;
-                $response['title'] = 'Records written';
-                $response['type'] = '/data/';
-            break;
-        }
+    case '':
+    case 'content':
+        $controller = new \Meent\WebHook\Controller\WebController();
+        $response = $controller->handleRequest($request, $response);
     break;
 
     default:
@@ -166,7 +107,7 @@ if ($outputType === 'html') {
 } else {
     $response['headers']['Content-Type'] = ['application/json'];
 
-    if ($response['type'] === '/errors/') {
+    if (empty($response['type']) || $response['type'] === '/errors/') {
         $response['title'] = empty($response['title']) ? 'Error' : $response['title'];
         $response['headers']['Content-Type'] = ['application/problem+json'];
         $contentType = 'errors';
@@ -175,7 +116,7 @@ if ($outputType === 'html') {
     }
 
     $body = [
-        'type' => $response['type'],
+        'type' => $response['type'] ?? '/' . $rootPath . '/',
         'title' => $response['title'] ?: $response['type'],
         $contentType => $response['content'],
     ];
