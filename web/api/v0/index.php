@@ -9,9 +9,9 @@ if (! empty($_SERVER['HTTP_HOST'])) {
 }
 
 $response = [
-    'body' => '',
     'headers' => [],
     'status' => 200,
+    'title' => '',
 ];
 
 switch ($_SERVER['REQUEST_URI'] ?? '') {
@@ -23,23 +23,19 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
             case 'GET':
             case 'PATCH':
             case 'PUT':
-                $response['body'] = [
-                    'type' => $uriRoot . '/errors/',
-                    'title' => 'Method not allowed',
-                    'errors' => [
-                        [
-                            'detail' => "Method $requestMethod is not allowed, MUST be POST",
-                            'pointer' => '#method-not-allowed',
-                        ],
+                $response['content'] = [[
+                        'detail' => "Method $requestMethod is not allowed, MUST be POST",
+                        'pointer' => '#method-not-allowed',
                     ],
                 ];
-                $response['headers']['Content-Type'] = 'application/problem+json';
                 $response['status'] = 405;
+                $response['title'] = 'Method not allowed';
+                $response['type'] = '/errors/';
                 break;
 
             case 'HEAD':
             case 'OPTIONS':
-                $response['headers']['Access-Control-Allow-Methods'] = 'OPTIONS, HEAD, POST';
+                $response['headers']['Access-Control-Allow-Methods'] = ['OPTIONS, HEAD, POST'];
                 $response['status'] = 204;
                 break;
 
@@ -55,18 +51,13 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
                     // For now, we'll accept any data that is not empty.
                     // Later on actual validation of the incoming data will be needed
                     // (otherwise we cannot convert it to Linked Data.
-                    $response['body'] = [
-                        'type' => $uriRoot . '/errors/',
-                        'title' => 'No data received',
-                        'errors' => [
-                            [
-                                'detail' => 'No data received',
-                                'pointer' => '#no-data-received',
-                            ],
-                        ],
-                    ];
-                    $response['headers']['Content-Type'] = 'application/problem+json';
+                    $response['content'] = [[
+                        'detail' => 'No data received',
+                        'pointer' => '#no-data-received',
+                    ]];
                     $response['status'] = 422;
+                    $response['title'] = 'No data received';
+                    $response['type'] = '/errors/';
                     break;
                 }
 
@@ -85,67 +76,90 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
                 // Write data to Solid Pod (@TODO: Decide on path / resource container)
 
                 // Return success
-                $response['body'] = [
-                    'type' => $uriRoot,
-                    /* @TODO: Add link to URL on Solid Pod . ''*/
-                    'title' => 'Records written',
-                    'data' => $data,
-                ];
+                /* @TODO: Add link to URL on Solid Pod . '' */
+                $response['content'] = $data;
                 $response['status'] = 201;
+                $response['title'] = 'Records written';
+                $response['type'] = '/data/';
                 break;
         }
-        break;
+    break;
 }
 
 $output = ob_get_clean();
 
 if ($output) {
-    $response['body'] = [
-        'type' => $uriRoot . '/errors/',
-        'title' => 'Unexpected Output',
-        'errors' => [
-            [
-                'detail' => 'The response caused unexpected output:' . htmlentities($output),
-                'pointer' => '#unexpected-output',
-            ],
-        ],
+    $response['content'] = [[
+        'detail' => 'The response caused unexpected output: ' . htmlentities(urldecode($output)),
+        'pointer' => '#unexpected-output',
+    ]];
+    $response['status'] = 500;
+    $response['title'] = 'Unexpected Output';
+    $response['type'] = '/errors/';
+}
+
+$content = $response['content'];
+
+if ($outputType === 'html') {
+    $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
+
+    $template = '<!-- @TODO: HTML CONTENT --> %s: <pre><code>%s</code></pre> %s';
+
+    $body = '<pre><code>' . htmlentities(json_encode($content,
+            JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) . '</code></pre>';
+
+    $content = vsprintf($template, [
+        $response['title'] ?? 'Response',
+        $body,
+        $response['type'] ?? $_SERVER['REQUEST_URI'],
+    ]);
+} else {
+    $response['headers']['Content-Type'] = ['application/json'];
+
+    if ($response['type'] === '/errors/') {
+        $response['title'] = 'Error';
+        $response['headers']['Content-Type'] = ['application/problem+json'];
+        $contentType = 'errors';
+    } else {
+        $contentType = 'data';
+    }
+
+    $body = [
+        'type' => $response['type'],
+        'title' => $response['title'] ?: $response['type'],
+        $contentType => $response['content'],
     ];
 
-    $response['status'] = 500;
-}
+    try {
+        $content = json_encode($body, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
+    } catch (JsonException $e) {
+        $body = <<<'JSON'
+        {
+            "type": "%s",
+            "title": "Response Encoding Failed",
+            "errors": [{
+                "detail": "Failed to convert response to JSON: %s",
+                "pointer": "#response-encoding-failed"
+             }]
+        }
+        JSON;
 
-$body = $response['body'];
-
-try {
-    $body = json_encode($body, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
-
-    if (! isset($response['headers']['Content-Type'])) {
-        $response['headers']['Content-Type'] = 'application/json';
+        $content = vsprintf($body, [
+            'type' => '/errors/',
+            'json-error' => $e->getMessage(),
+        ]);
+        $response['headers']['Content-Type'] = ['application/problem+json'];
+        $response['status'] = 500;
     }
-} catch (JsonException $e) {
-    $body = <<<'JSON'
-{
-    "type": "%s",
-    "title": "Response Encoding Failed",
-    "errors": [{
-        "detail": "Failed to convert response to JSON: %s",
-        "pointer": "#response-encoding-failed"
-     }]
-}
-JSON;
-
-    $response['body'] = vsprintf($body, [
-        'type' => $uriRoot . '/errors/',
-        'json-error' => $e->getMessage(),
-    ]);
-    $response['headers']['Content-Type'] = 'application/problem+json';
-    $response['status'] = 500;
 }
 
 http_response_code($response['status']);
 
-array_walk($response['headers'], static function ($value, $key) {
-    header("$key: $value");
+array_walk($response['headers'], static function ($values, $name) {
+    array_walk($values, static function ($value) use ($name) {
+        header(sprintf('%s: %s', $name, $value), false);
+    });
 });
 
-echo trim($body);
+echo trim($content);
+exit;
