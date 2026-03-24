@@ -6,11 +6,20 @@ use Psr\Http\Message\RequestInterface;
 
 class ApiController
 {
+    private const AVAILABLE_VERSIONS = [
+        'v0.1',
+        'v0.2',
+    ];
+
     final public function handleRequest(RequestInterface $request, $response)
     {
         $requestUri = $request->getUri()->getPath();
         $requestMethod = $request->getMethod();
         $uriRoot = $request->getUri()->getScheme() . '://' . $request->getUri()->getHost() . ($request->getUri()->getPort() ? ':' . $request->getUri()->getPort() : '');
+
+        $response['type'] = '/api/';
+
+        $version = $this->getVersionFromRequest($request);
 
         switch ($requestUri) {
             case '':
@@ -104,5 +113,36 @@ class ApiController
         }
 
         return $response;
+    }
+
+    private function getLatestVersion(): string
+    {
+        $versions = self::AVAILABLE_VERSIONS;
+
+        usort($versions, 'version_compare');
+
+        return end($versions);
+    }
+
+    private function getVersionFromRequest(RequestInterface $request)
+    {
+        $path = $request->getUri()->getPath();
+        $parts = array_values(array_filter(explode('/', $path)));
+
+        if ($parts[0] !== 'api') {
+            throw new \Exception('Invalid path');
+        } elseif (
+            count($parts) === 1
+            || ($parts[1] === 'v0' || $parts[1] === 'latest')
+            || (! preg_match('/^v[0-9]+\.[0-9]+$/', $parts[1]))
+        ) {
+            $version = $this->getLatestVersion();
+        } elseif (in_array($parts[1], self::AVAILABLE_VERSIONS)) {
+            $version = $parts[1];
+        } else {
+            throw new \Exception('Invalid version');
+        }
+
+        return (float) ltrim($version, 'v');
     }
 }
