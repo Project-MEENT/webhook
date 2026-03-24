@@ -1,0 +1,22 @@
+{
+    "autoload": {
+        "psr-4": {
+            "Meent\\Webhook\\": "src/"
+        }
+    },
+    "config": {
+        "bin-dir": "bin/",
+        "sort-packages": true
+    },
+    "description": "Webhook to write data from a P1 dongle to a Solid Pod.",
+    "license": "EUPL-1.2",
+    "name": "meent/webhook",
+    "require": {
+        "php": "^8.0",
+        "ext-json": "*",
+        "ext-mbstring": "*"
+    },
+    "require-dev": {
+    },
+    "type": "project"
+}
