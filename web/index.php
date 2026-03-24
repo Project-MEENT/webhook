@@ -1,8 +1,12 @@
 <?php
 
+use Laminas\Diactoros\ServerRequestFactory;
+
 ob_start();
 
-$requestMethod = $_SERVER['REQUEST_METHOD'] ?? '';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+$request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
 $uriRoot = '';
 if (! empty($_SERVER['HTTP_HOST'])) {
     $uriRoot = 'https://' . $_SERVER['HTTP_HOST'];
@@ -14,13 +18,43 @@ $response = [
     'title' => '',
 ];
 
-switch ($_SERVER['REQUEST_URI'] ?? '') {
-    case '/':
+$path = $request->getUri()->getPath();
+$requestMethod = $request->getMethod();
+
+$acceptHeader = $request->getHeaderLine('Accept');
+$queryParams = $request->getQueryParams();
+if (isset($queryParams['accept'])) {
+    $acceptHeader = $queryParams['accept'];
+    unset($queryParams['accept']);
+    $request = $request
+        ->withQueryParams($queryParams)
+        ->withHeader('Accept', $acceptHeader);
+}
+
+$accept = array_map(static function ($value) {
+    // @TODO: Sort by quality?
+    return explode(';', $value)[0];
+}, explode(',', $acceptHeader));
+
+switch ($accept[0]) {
+    case 'application/json':
+        $outputType = 'json';
+    break;
+
+    case 'application/xhtml+xml':
+    case 'text/html':
+    default:
+        $outputType = 'html';
+    break;
+}
+
+switch ($path) {
+    case '/api/v0/':
         $response['content'] = "For more information, visit $uriRoot";
         $response['title'] = 'EnergyID Webhook';
         $response['type'] = $uriRoot;
     break;
-    case 'data/':
+    case '/api/v0/data/':
         switch ($requestMethod) {
             case 'GET':
             case 'PATCH':
@@ -89,12 +123,12 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
 
     default:
         $response['content'] = [[
-            'detail' => 'The requested resource "' . $requestUri . '" was not found on this server.',
+            'detail' => 'The requested resource "' . $path . '" was not found on this server.',
             'pointer' => '#not-found',
         ]];
         $response['status'] = 404;
         $response['type'] = '/errors/';
-
+        $response['title'] = 'Not found';
     break;
 }
 
@@ -126,14 +160,14 @@ if ($outputType === 'html') {
         $content = vsprintf($template, [
             $response['title'] ?? 'Response',
             $body,
-            $response['type'] ?? $_SERVER['REQUEST_URI'],
+            $response['type'] ?? $request->getUri()->getPath(),
         ]);
     }
 } else {
     $response['headers']['Content-Type'] = ['application/json'];
 
     if ($response['type'] === '/errors/') {
-        $response['title'] = 'Error';
+        $response['title'] = empty($response['title']) ? 'Error' : $response['title'];
         $response['headers']['Content-Type'] = ['application/problem+json'];
         $contentType = 'errors';
     } else {
