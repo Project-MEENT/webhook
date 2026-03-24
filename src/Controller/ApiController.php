@@ -14,12 +14,18 @@ class ApiController
 
         switch ($requestUri) {
             case '':
+            case '/api/':
             case '/api/v0/':
+            case '/api/v0.1/':
+            case '/api/latest/':
                 $response['content'] = "For more information, visit $uriRoot";
                 $response['title'] = 'EnergyID Webhook';
                 $response['type'] = '/api/';
             break;
+            case '/api/data/':
             case '/api/v0/data/':
+            case '/api/v0.1/data/':
+            case '/api/latest/data/':
                 switch ($requestMethod) {
                     case 'GET':
                     case 'PATCH':

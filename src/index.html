@@ -21,13 +21,41 @@
 <main>
     <section>
         <h2>Request</h2>
-        <form action="/api/v0/data/" method="POST">
+        <form action="/api/data/" method="POST">
             <p>To make it easier to develop and demo the webhook, this form is provided</p>
             <p>
                 The form below mimics the Dongle behavior, so it is possible to show the working of the webhook without a dongle
             </p>
             <fieldset>
-                <legend>P1 Data</legend>
+                <legend>API Version</legend>
+                <label>
+                    <select name="api-version">
+                        <option value="v0">v0</option>
+                        <optgroup label="v0.*">
+                            <option value="v0.1">v0.1</option>
+                        </optgroup>
+                        <option value="" selected>latest</option>
+                    </select>
+                </label>
+                <dl>
+                    <dt><strong>latest</strong></dt>
+                    <dt>v0</dt>
+                    <dt>v0.1</dt>
+                    <dd>This is the default version of the API</dd>
+                    <dd>This version does not contain any logic, only scaffolding.</dd>
+                </dl>
+            </fieldset>
+            <fieldset>
+                <legend>P1 Data (JSON format)</legend>
+
+                    <dt><strong>v0.1</strong></dt>
+                    <dd>This version stores received data as-is in the API, but does write to a Solid Pod, as it does not have User <==> WebId mapping</dd>
+
+                    <dt><strong>v0.2</strong></dt>
+                    <dd>This version stores received data as-is in a Solid mapped to a WebId</dd>
+
+                    <dt><strong>v0.3</strong></dt>
+                    <dd>This version stores received data converted to Linked Data in a Solid mapped to a WebId</dd>
                 <label>
                     <textarea placeholder="Dongle data goes here..." rows="20"></textarea>
                 </label>
@@ -55,9 +83,17 @@
 
         const data = form.querySelector('textarea').value
 
-        const headers = { 'Content-Type': 'application/json' }
+        const headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        }
 
         let url = form.action || window.location.href
+
+        const version = form.querySelector('select[name="api-version"]').value
+        if (version) {
+            url = url.replace(/\/api\/?/, `/api/${version}/`)
+        }
 
         try {
             const response = await fetch(url, {
