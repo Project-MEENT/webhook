@@ -33,6 +33,7 @@
                         <option value="v0">v0</option>
                         <optgroup label="v0.*">
                             <option value="v0.1">v0.1</option>
+                            <option value="v0.2">v0.2</option>
                         </optgroup>
                         <option value="" selected>latest</option>
                     </select>
@@ -112,6 +113,12 @@
 
             try {
                 const json = JSON.parse(responseText)
+
+                // Add a link to the data
+                if (json.title && json.title.startsWith('Records written to ')) {
+                    const dataUrl = json.title.split(' ')[3]
+                    output.insertAdjacentHTML('afterend', `<a href="/api/data/${dataUrl}">See data</a>`)
+                }
 
                 // Check if there is an RFC-9457 compliant error
                 const hash = json.errors[0]?.pointer.substring(1)

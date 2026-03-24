@@ -7,6 +7,9 @@ use Psr\Http\Message\RequestInterface;
 
 class ApiController
 {
+    private const API_DATA = 'data';
+    private const API_ROOT = '__ROOT__';
+
     private const AVAILABLE_VERSIONS = [
         'v0.1',
         'v0.2',
@@ -27,25 +30,46 @@ class ApiController
 
         $response['type'] = '/api/';
 
-        $version = $this->getVersionFromRequest($request);
+        $version = $this->getRequestedVersion($request);
+        $subject = $this->getRequestedSubject($request);
 
-        switch ($requestUri) {
+        switch ($subject) {
             case '':
-            case '/api/':
-            case '/api/v0/':
-            case '/api/v0.1/':
-            case '/api/v0.2/':
-            case '/api/latest/':
+            case self::API_ROOT:
                 $response['content'] = "For more information, visit $uriRoot";
                 $response['title'] = 'EnergyID Webhook';
-            break;
-            case '/api/data/':
-            case '/api/v0/data/':
-            case '/api/v0.1/data/':
-            case '/api/v0.2/data/':
-            case '/api/latest/data/':
+        break;
+            case self::API_DATA:
                 switch ($requestMethod) {
                     case 'GET':
+                        if ($version >= 0.2) {
+                            $filePath = $this->getRequestedObject($request);
+
+                            $isValidPath = strpos($filePath, '/') === false || ! str_ends_with($filePath, '.data');
+                            if ($isValidPath) {
+                                $response['content'] = [[
+                                    'detail' => 'Invalid path',
+                                    'pointer' => '#invalid-path',
+                                ]];
+                                $response['status'] = 400;
+                                $response['title'] = 'Invalid path';
+                                $response['type'] = '/errors/';
+                            } elseif (! $this->filesystem->fileExists($filePath)) {
+                                $response['content'] = [[
+                                    'detail' => "The requested resource '" . $filePath . "' was not found on this server.",
+                                    'pointer' => '#not-found',
+                                ]];
+                                $response['status'] = 404;
+                                $response['title'] = 'Not found';
+                                $response['type'] = '/errors/';
+                            } else {
+                                $contents = $this->filesystem->read($filePath);
+                                $response['content'] = $contents;
+                                $response['status'] = 200;
+                                $response['title'] = 'File Contents';
+                            }
+                        break;
+                        }
                     case 'PATCH':
                     case 'PUT':
                         $response['content'] = [
@@ -142,10 +166,42 @@ class ApiController
         return end($versions);
     }
 
-    private function getVersionFromRequest(RequestInterface $request)
+    private function getRequestedObject(RequestInterface $request)
     {
+        $subject = $this->getRequestedSubject($request);
         $path = $request->getUri()->getPath();
-        $parts = array_values(array_filter(explode('/', $path)));
+
+        $object = substr($path, strpos($path, $subject) + strlen($subject));
+        $object = ltrim($object, '/');
+
+        return $object;
+    }
+
+    private function getRequestedSubject(RequestInterface $request)
+    {
+        $parts = $this->splitUriPath($request);
+
+        if ($parts[0] !== 'api') {
+            throw new \Exception('Invalid path');
+        } elseif (count($parts) === 1) {
+            $subject = self::API_ROOT;
+        } else {
+            $versions = self::AVAILABLE_VERSIONS;
+            $versions[] = 'latest';
+            $versions[] = 'v0';
+            if (in_array($parts[1], $versions)) {
+                $subject = $parts[2] ?? self::API_ROOT;
+            } else {
+                $subject = $parts[1];
+            }
+        }
+
+        return $subject;
+    }
+
+    private function getRequestedVersion(RequestInterface $request)
+    {
+        $parts = $this->splitUriPath($request);
 
         if ($parts[0] !== 'api') {
             throw new \Exception('Invalid path');
@@ -162,5 +218,12 @@ class ApiController
         }
 
         return (float) ltrim($version, 'v');
+    }
+
+    private function splitUriPath(RequestInterface $request): array
+    {
+        $path = $request->getUri()->getPath();
+
+        return array_values(array_filter(explode('/', $path)));
     }
 }
