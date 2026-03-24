@@ -16,9 +16,11 @@ $response = [
 
 switch ($_SERVER['REQUEST_URI'] ?? '') {
     case '/':
-        // @TODO: Show information about the webhook, add content negotiation
-        break;
-    default:
+        $response['content'] = "For more information, visit $uriRoot";
+        $response['title'] = 'EnergyID Webhook';
+        $response['type'] = $uriRoot;
+    break;
+    case 'data/':
         switch ($requestMethod) {
             case 'GET':
             case 'PATCH':
@@ -31,13 +33,13 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
                 $response['status'] = 405;
                 $response['title'] = 'Method not allowed';
                 $response['type'] = '/errors/';
-                break;
+            break;
 
             case 'HEAD':
             case 'OPTIONS':
                 $response['headers']['Access-Control-Allow-Methods'] = ['OPTIONS, HEAD, POST'];
                 $response['status'] = 204;
-                break;
+            break;
 
             case 'POST':
                 // Receive incoming data
@@ -81,16 +83,30 @@ switch ($_SERVER['REQUEST_URI'] ?? '') {
                 $response['status'] = 201;
                 $response['title'] = 'Records written';
                 $response['type'] = '/data/';
-                break;
+            break;
         }
+    break;
+
+    default:
+        $response['content'] = [[
+            'detail' => 'The requested resource "' . $requestUri . '" was not found on this server.',
+            'pointer' => '#not-found',
+        ]];
+        $response['status'] = 404;
+        $response['type'] = '/errors/';
+
     break;
 }
 
 $output = ob_get_clean();
 
 if ($output) {
+    if ($outputType === 'html') {
+        $output = htmlentities(urldecode($output));
+    }
+
     $response['content'] = [[
-        'detail' => 'The response caused unexpected output: ' . htmlentities(urldecode($output)),
+        'detail' => 'The response caused unexpected output: ' . $output,
         'pointer' => '#unexpected-output',
     ]];
     $response['status'] = 500;
@@ -103,16 +119,16 @@ $content = $response['content'];
 if ($outputType === 'html') {
     $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
 
-    $template = '<!-- @TODO: HTML CONTENT --> %s: <pre><code>%s</code></pre> %s';
-
-    $body = '<pre><code>' . htmlentities(json_encode($content,
-            JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) . '</code></pre>';
-
-    $content = vsprintf($template, [
-        $response['title'] ?? 'Response',
-        $body,
-        $response['type'] ?? $_SERVER['REQUEST_URI'],
-    ]);
+    if (is_array($content) || $response['title'] !== '') {
+        $template = '<!-- @TODO: HTML CONTENT --> %s: <pre><code>%s</code></pre> %s';
+        $body = '<pre><code>' . htmlentities(json_encode($content,
+                JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) . '</code></pre>';
+        $content = vsprintf($template, [
+            $response['title'] ?? 'Response',
+            $body,
+            $response['type'] ?? $_SERVER['REQUEST_URI'],
+        ]);
+    }
 } else {
     $response['headers']['Content-Type'] = ['application/json'];
 
