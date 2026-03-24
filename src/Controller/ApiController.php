@@ -2,6 +2,7 @@
 
 namespace Meent\WebHook\Controller;
 
+use League\Flysystem\Filesystem;
 use Psr\Http\Message\RequestInterface;
 
 class ApiController
@@ -10,6 +11,13 @@ class ApiController
         'v0.1',
         'v0.2',
     ];
+
+    private Filesystem $filesystem;
+
+    final public function __construct(Filesystem $filesystem)
+    {
+        $this->filesystem = $filesystem;
+    }
 
     final public function handleRequest(RequestInterface $request, $response)
     {
@@ -26,14 +34,15 @@ class ApiController
             case '/api/':
             case '/api/v0/':
             case '/api/v0.1/':
+            case '/api/v0.2/':
             case '/api/latest/':
                 $response['content'] = "For more information, visit $uriRoot";
                 $response['title'] = 'EnergyID Webhook';
-                $response['type'] = '/api/';
             break;
             case '/api/data/':
             case '/api/v0/data/':
             case '/api/v0.1/data/':
+            case '/api/v0.2/data/':
             case '/api/latest/data/':
                 switch ($requestMethod) {
                     case 'GET':
@@ -60,7 +69,7 @@ class ApiController
                         // Receive incoming data
                         $input = file_get_contents('php://input');
 
-                        // Check Authentication
+                        // @TODO: Check Authentication
 
                         // @TODO: Convert to Linked-Data once ontology is decided upon
                         if (empty($input)) {
@@ -85,18 +94,27 @@ class ApiController
                             $data = $input;
                         }
 
-
                         // Check which Solid Pod to write to
 
                         // Connect to Solid Pod (using ? see Solid Specs)
 
                         // Write data to Solid Pod (@TODO: Decide on path / resource container)
+                        $message = 'Records written';
+                        if ($version >= 0.2) {
+                            $timestamp = date('Ymd/His');
+                            $id = rtrim(strtr(base64_encode(random_bytes(12)), '+/', '-_'), '=');
+                            $filePath = "$timestamp.$id.data";
+
+                            $message .= ' to ' . $filePath;
+
+                            $this->filesystem->write($filePath, $data);
+                        }
 
                         // Return success
                         /* @TODO: Add link to URL on Solid Pod . '' */
                         $response['content'] = $data;
                         $response['status'] = 201;
-                        $response['title'] = 'Records written';
+                        $response['title'] = $message;
                     break;
                 }
             break;

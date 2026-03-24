@@ -37,25 +37,27 @@
                         <option value="" selected>latest</option>
                     </select>
                 </label>
-                <dl>
-                    <dt><strong>latest</strong></dt>
-                    <dt>v0</dt>
-                    <dt>v0.1</dt>
-                    <dd>This is the default version of the API</dd>
-                    <dd>This version does not contain any logic, only scaffolding.</dd>
-                </dl>
+                <details>
+                    <summary>Changelog</summary>
+                    <dl>
+                        <dt>v0.1</dt>
+                        <dd>This version does not contain any logic, only scaffolding.</dd>
+
+                        <dt>v0</dt>
+                        <dt><strong>v0.2 (latest)</strong></dt>
+                        <dd>This is the default version of the API</dd>
+                        <dd>This version stores received data as-is in the API, but does write to a Solid Pod, as it does not have User <==> WebId mapping</dd>
+
+                        <dt>v0.3</dt>
+                        <dd>This version stores received data as-is in a Solid mapped to a WebId</dd>
+
+                        <dt>v0.4</dt>
+                        <dd>This version stores received data converted to Linked Data in a Solid mapped to a WebId</dd>
+                    </dl>
+                    </details>
             </fieldset>
             <fieldset>
                 <legend>P1 Data (JSON format)</legend>
-
-                    <dt><strong>v0.1</strong></dt>
-                    <dd>This version stores received data as-is in the API, but does write to a Solid Pod, as it does not have User <==> WebId mapping</dd>
-
-                    <dt><strong>v0.2</strong></dt>
-                    <dd>This version stores received data as-is in a Solid mapped to a WebId</dd>
-
-                    <dt><strong>v0.3</strong></dt>
-                    <dd>This version stores received data converted to Linked Data in a Solid mapped to a WebId</dd>
                 <label>
                     <textarea placeholder="Dongle data goes here..." rows="20"></textarea>
                 </label>

@@ -1,11 +1,22 @@
 <?php
 
+namespace Meent\WebHook;
+
 use Laminas\Diactoros\ServerRequestFactory;
+use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\Local\LocalFilesystemAdapter;
 
 ob_start();
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+// Create FileSystem
+$adapter = new LocalFilesystemAdapter(__DIR__ . '/../build/data');
+// @TODO: Replace local filesystem with Solid Pod filesystem
+$filesystem = new Filesystem($adapter);
+
+// Create PSR Request and Response objects
 $request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
 $uriRoot = '';
 if (! empty($_SERVER['HTTP_HOST'])) {
@@ -21,7 +32,6 @@ $response = [
 $path = $request->getUri()->getPath();
 $pathParts = array_values(array_filter(explode('/', $path)));
 $rootPath = $pathParts[0] ?? '';
-$requestMethod = $request->getMethod();
 
 $acceptHeader = $request->getHeaderLine('Accept');
 $queryParams = $request->getQueryParams();
@@ -52,8 +62,18 @@ switch ($accept[0]) {
 
 switch ($rootPath) {
     case 'api':
-        $controller = new \Meent\WebHook\Controller\ApiController();
-        $response = $controller->handleRequest($request, $response);
+        $controller = new \Meent\WebHook\Controller\ApiController($filesystem);
+        try {
+            $response = $controller->handleRequest($request, $response);
+        } catch (FilesystemException $exception) {
+            $response['content'] = [[
+                'detail' => 'Failed to write data: ' . $exception->getMessage(),
+                'pointer' => '#write-failed',
+            ]];
+            $response['status'] = 500;
+            $response['title'] = 'Failed to write data';
+            $response['type'] = '/errors/';
+        }
     break;
 
     case '':
@@ -95,9 +115,25 @@ if ($outputType === 'html') {
     $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
 
     if (is_array($content) || $response['title'] !== '') {
-        $template = '<!-- @TODO: HTML CONTENT --> %s: <pre><code>%s</code></pre> %s';
-        $body = '<pre><code>' . htmlentities(json_encode($content,
-                JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) . '</code></pre>';
+        if ($response['type'] === '/errors/') {
+            $body = '<ul>';
+            foreach ($content as $error) {
+                $body .= vsprintf('<li><strong>%s</strong>: %s</li>', [
+                    '<a href="' . htmlentities($response['type'] . $error['pointer']) . '">' . htmlentities($error['pointer']) . '</a>',
+                    htmlentities(urldecode($error['detail'])),
+                ]);
+            }
+            $body .= '</ul>';
+        } else {
+            $body = '<pre><code>' . htmlentities(json_encode($content,
+                    JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) . '</code></pre>';
+        }
+
+        $fileHandle = fopen(__FILE__, 'rb');
+        fseek($fileHandle, __COMPILER_HALT_OFFSET__);
+        $template = stream_get_contents($fileHandle);
+        fclose($fileHandle);
+
         $content = vsprintf($template, [
             $response['title'] ?? 'Response',
             $body,
