@@ -8,11 +8,13 @@ use Psr\Http\Message\RequestInterface;
 class ApiController
 {
     private const API_DATA = 'data';
+    private const API_REGISTER = 'register';
     private const API_ROOT = '__ROOT__';
 
     private const AVAILABLE_VERSIONS = [
-        'v0.1',
-        'v0.2',
+        'v0.1', // No-op
+        'v0.2', // Store without API key
+        'v0.3', // Store with registered API key
     ];
 
     private Filesystem $filesystem;
@@ -29,13 +31,17 @@ class ApiController
         $subject = $this->getRequestedSubject($request);
 
         switch ($subject) {
+            case self::API_DATA:
+                $response = $this->handleDataRequest($request, $response);
+            break;
+
+            case self::API_REGISTER:
+                $response = $this->handleRegisterRequest($request, $response);
+            break;
+
             case '':
             case self::API_ROOT:
                 $response = $this->handleRootRequest($request, $response);
-            break;
-
-            case self::API_DATA:
-                $response = $this->handleDataRequest($request, $response);
             break;
 
             default:
@@ -193,7 +199,43 @@ class ApiController
     {
         $version = $this->getRequestedVersion($request);
 
-        // @TODO: Check Authentication
+        if ($version >= 0.3) {
+            // When a request is received, it MUST have an "Authorization" header with a "Bearer" scheme:
+            //      Authorization: Bearer {api-key}
+            $auth = $request->getHeaderLine('Authorization');
+
+            if (empty($auth)) {
+                $response['content'] = [[
+                    'detail' => 'Missing API key',
+                    'pointer' => '#api-key-missing',
+                ]];
+                $response['status'] = 401;
+                $response['title'] = 'Missing API key';
+                $response['type'] = '/errors/';
+            } else if (! str_starts_with($auth, 'Bearer ')) {
+                $response['content'] = [[
+                    'detail' => 'Invalid Authorization header format, expected "Bearer {api-key}"',
+                    'pointer' => '#invalid-auth-header',
+                ]];
+                $response['status'] = 400;
+                $response['title'] = 'Invalid Authorization header';
+                $response['type'] = '/errors/';
+            } else if ($this->filesystem->fileExists('keys/' . substr($auth, 7) . '.key') === false) {
+                $response['content'] = [[
+                    'detail' => 'Invalid API key',
+                    'pointer' => '#invalid-api-key',
+                ]];
+                $response['status'] = 401;
+                $response['title'] = 'The provided API key is invalid';
+                $response['type'] = '/errors/';
+            } else {
+                $apiKey = substr($auth, 7);
+            }
+
+            if (! isset($apiKey)) {
+                return $response;
+            }
+        }
 
         // @TODO: Convert to Linked-Data once ontology is decided upon
         if (empty($input)) {
@@ -209,7 +251,6 @@ class ApiController
             $response['title'] = 'No data received';
             $response['type'] = '/errors/';
         } else {
-
             try {
                 $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
             } catch (\JsonException $e) {
@@ -218,15 +259,27 @@ class ApiController
             }
 
             // Check which Solid Pod to write to
+            if (isset($apiKey)) {
+                $webid = $this->filesystem->read('keys/' . $apiKey . '.key');
+            }
 
             // Connect to Solid Pod (using ? see Solid Specs)
 
             // Write data to Solid Pod (@TODO: Decide on path / resource container)
             $message = 'Records written';
             if ($version >= 0.2) {
-                $timestamp = date('Ymd/His');
                 $id = rtrim(strtr(base64_encode(random_bytes(12)), '+/', '-_'), '=');
-                $filePath = "$timestamp.$id.data";
+                if ($version >= 0.3) {
+                    // When data is received, it is stored in `/{webid-hash}/{timestamp}.{id}.data`
+                    $filePath = vsprintf("%s/%s.%s.data", [
+                        'webIdHash' => hash('sha256', $webid),
+                        'timestamp' => date('Ymd.His'),
+                        $id
+                    ]);
+                } else {
+                    $timestamp = date('Ymd/His');
+                    $filePath = "$timestamp.$id.data";
+                }
 
                 $message .= ' to ' . $filePath;
 
@@ -271,6 +324,78 @@ class ApiController
         $response['status'] = 404;
         $response['title'] = 'Not found';
         $response['type'] = '/errors/';
+
+        return $response;
+    }
+
+    private function handleRegisterPost(RequestInterface $request, $response)
+    {
+        $input = $request->getBody()->getContents();
+        $webId = trim($input);
+
+        if (empty($webId)) {
+            $response['content'] = [[
+                'detail' => 'No data received',
+                'pointer' => '#no-data-received',
+            ]];
+            $response['status'] = 422;
+            $response['title'] = 'No data received';
+            $response['type'] = '/errors/';
+        } else if (filter_var($webId, FILTER_VALIDATE_URL) === false) {
+            $response['content'] = [[
+                'detail' => 'Provided WebID "' . $webId . '" is not a valid URL',
+                'pointer' => '#invalid-url',
+            ]];
+            $response['status'] = 422;
+            $response['title'] = 'Invalid URL';
+            $response['type'] = '/errors/';
+        } else {
+            $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
+            $webIdHash = hash('sha256', $webId);
+
+            $filePath = 'keys/' . $apiKey . '.key';
+            $this->filesystem->write($filePath, $webId);
+
+            $this->filesystem->createDirectory($webIdHash);
+
+            $response['content'] = [
+                'api_key' => $apiKey,
+                'webid'   => $webId,
+            ];
+            $response['status'] = 201;
+            $response['title'] = 'WebID registered';
+        }
+
+        return $response;
+    }
+
+    private function handleRegisterRequest(RequestInterface $request, $response)
+    {
+        $requestMethod = $request->getMethod();
+        $version = $this->getRequestedVersion($request);
+
+        if ($version > 0.2) {
+            $allowedMethods = ['POST'];
+
+            switch ($requestMethod) {
+                case 'GET':
+                case 'PATCH':
+                case 'PUT':
+                    $response = $this->handleMethodNotAllowed($response, $request, $allowedMethods);
+                break;
+
+                case 'HEAD':
+                case 'OPTIONS':
+                    $response = $this->handleAllowedHttpMethods($response, $allowedMethods);
+                break;
+
+                case 'POST':
+                    $response = $this->handleRegisterPost($request, $response);
+                break;
+            }
+        } else {
+            $response = $this->handleNotFound($request, $response);
+        }
 
         return $response;
     }
