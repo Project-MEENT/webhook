@@ -51,6 +51,41 @@ class ApiController
         return $response;
     }
 
+    private function checkAuthorization($request, $response)
+    {
+        $auth = $request->getHeaderLine('Authorization');
+
+        if (empty($auth)) {
+            $response['content'] = [[
+                'detail' => 'Missing API key',
+                'pointer' => '#api-key-missing',
+            ]];
+            $response['status'] = 401;
+            $response['title'] = 'Missing API key';
+            $response['type'] = '/errors/';
+        } elseif (! str_starts_with($auth, 'Bearer ')) {
+            $response['content'] = [[
+                'detail' => 'Invalid Authorization header format, expected "Bearer {api-key}"',
+                'pointer' => '#invalid-auth-header',
+            ]];
+            $response['status'] = 400;
+            $response['title'] = 'Invalid Authorization header';
+            $response['type'] = '/errors/';
+        } elseif ($this->getFilesystem()->fileExists('keys/' . substr($auth, 7) . '.key') === false) {
+            $response['content'] = [[
+                'detail' => 'Invalid API key',
+                'pointer' => '#invalid-api-key',
+            ]];
+            $response['status'] = 401;
+            $response['title'] = 'The provided API key is invalid';
+            $response['type'] = '/errors/';
+        } else {
+            $response = [];
+        }
+
+        return $response;
+    }
+
     private function getLatestVersion()
     {
         $versions = self::AVAILABLE_VERSIONS;
@@ -115,6 +150,21 @@ class ApiController
         return (float) ltrim($version, 'v');
     }
 
+    private function createWebIdHash(string $webId): string
+    {
+        $url = parse_url($webId);
+
+        $webId = $url['scheme'] . ($url['scheme'] === 'http' ? 's' : '')
+            . '://'
+            . $url['host']
+            . (array_key_exists('port', $url) ? ':'.$url['port'] : '')
+            . rtrim($url['path'], '/')
+        ;
+        $webId = strtolower($webId);
+
+        return hash('sha1', $webId);
+    }
+
     private function handleAllowedHttpMethods($response,  $allowedMethods)
     {
         natcasesort($allowedMethods);
@@ -165,6 +215,17 @@ class ApiController
 
     private function handleDataGet(RequestInterface $request, $response)
     {
+        $version = $this->getRequestedVersion($request);
+
+
+        if ($version >= 0.3) {
+            $authError = $this->checkAuthorization($request, $response);
+
+            if($authError !== []) {
+                return $authError;
+            }
+        }
+
         $filePath = $this->getRequestedObject($request);
 
         $isValidPath = strpos($filePath, '/') === false || ! str_ends_with($filePath, '.data');
@@ -201,38 +262,13 @@ class ApiController
         if ($version >= 0.3) {
             // When a request is received, it MUST have an "Authorization" header with a "Bearer" scheme:
             //      Authorization: Bearer {api-key}
-            $auth = $request->getHeaderLine('Authorization');
+            $authError = $this->checkAuthorization($request, $response);
 
-            if (empty($auth)) {
-                $response['content'] = [[
-                    'detail' => 'Missing API key',
-                    'pointer' => '#api-key-missing',
-                ]];
-                $response['status'] = 401;
-                $response['title'] = 'Missing API key';
-                $response['type'] = '/errors/';
-            } else if (! str_starts_with($auth, 'Bearer ')) {
-                $response['content'] = [[
-                    'detail' => 'Invalid Authorization header format, expected "Bearer {api-key}"',
-                    'pointer' => '#invalid-auth-header',
-                ]];
-                $response['status'] = 400;
-                $response['title'] = 'Invalid Authorization header';
-                $response['type'] = '/errors/';
-            } else if ($this->filesystem->fileExists('keys/' . substr($auth, 7) . '.key') === false) {
-                $response['content'] = [[
-                    'detail' => 'Invalid API key',
-                    'pointer' => '#invalid-api-key',
-                ]];
-                $response['status'] = 401;
-                $response['title'] = 'The provided API key is invalid';
-                $response['type'] = '/errors/';
+            if($authError !== []) {
+                return $authError;
             } else {
+                $auth = $request->getHeaderLine('Authorization');
                 $apiKey = substr($auth, 7);
-            }
-
-            if (! isset($apiKey)) {
-                return $response;
             }
         }
 
@@ -271,7 +307,7 @@ class ApiController
                 if ($version >= 0.3) {
                     // When data is received, it is stored in `/{webid-hash}/{timestamp}.{id}.data`
                     $filePath = vsprintf("%s/%s.%s.data", [
-                        'webIdHash' => hash('sha256', $webId),
+                        'webIdHash' => $this->createWebIdHash($webId),
                         'timestamp' => date('Ymd.His'),
                         $id
                     ]);
@@ -350,7 +386,7 @@ class ApiController
             $response['type'] = '/errors/';
         } else {
             $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
-            $webIdHash = hash('sha256', $webId);
+            $webIdHash = $this->createWebIdHash($webId);
 
             $filePath = 'keys/' . $apiKey . '.key';
             $this->filesystem->write($filePath, $webId);
