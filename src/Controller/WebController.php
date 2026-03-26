@@ -7,6 +7,7 @@ use Psr\Http\Message\RequestInterface;
 class WebController extends AbstractController
 {
     private const SUBJECT_CONTENT = 'content';
+    private const SUBJECT_ERROR = 'errors';
 
     final public function handleRequest(RequestInterface $request, $response)
     {
@@ -22,6 +23,15 @@ class WebController extends AbstractController
             case self::SUBJECT_CONTENT:
                 if (str_contains($acceptHeader, 'application/json')) {
                     $response['title'] = 'EnergyID Webhook';
+                } else {
+                    $contents = $this->getContents($subject);
+                    $response['content'] = $contents;
+                }
+            break;
+
+            case self::SUBJECT_ERROR:
+                if (str_contains($acceptHeader, 'application/json')) {
+                    $response['title'] = 'Errors';
                 } else {
                     $contents = $this->getContents($subject);
                     $response['content'] = $contents;
