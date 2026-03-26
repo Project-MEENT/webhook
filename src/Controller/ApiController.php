@@ -5,7 +5,7 @@ namespace Meent\WebHook\Controller;
 use League\Flysystem\FilesystemOperator;
 use Psr\Http\Message\RequestInterface;
 
-class ApiController
+class ApiController extends AbstractController
 {
     private const AVAILABLE_VERSIONS = [
         'v0.1', // No-op
@@ -15,7 +15,6 @@ class ApiController
 
     private const SUBJECT_DATA = 'data';
     private const SUBJECT_REGISTER = 'register';
-    private const SUBJECT_ROOT = '__ROOT__';
 
     private FilesystemOperator $filesystem;
 
@@ -163,18 +162,6 @@ class ApiController
         $webId = strtolower($webId);
 
         return hash('sha1', $webId);
-    }
-
-    private function handleAllowedHttpMethods($response,  $allowedMethods)
-    {
-        natcasesort($allowedMethods);
-
-        $methods = implode(', ', $allowedMethods);
-        $response['headers']['Allow'] = [$methods];
-        $response['headers']['Access-Control-Allow-Methods'] = [$methods];
-        $response['status'] = 204;
-
-        return $response;
     }
 
     private function handleDataRequest(RequestInterface $request, $response)
@@ -331,38 +318,6 @@ class ApiController
         return $response;
     }
 
-    private function handleMethodNotAllowed($response, $request, $allowedMethods)
-    {
-        $requestMethod = $request->getMethod();
-
-        $response['content'] = [[
-            'detail' => "Method $requestMethod is not allowed, MUST be "
-                . (count($allowedMethods) > 1 ? 'one of ' : '')
-                . implode(', ', $allowedMethods),
-            'pointer' => '#method-not-allowed',
-        ]];
-        $response['status'] = 405;
-        $response['title'] = 'Method not allowed';
-        $response['type'] = '/errors/';
-
-        return $response;
-    }
-
-    private function handleNotFound(RequestInterface $request, $response)
-    {
-        $requestUri = $request->getUri()->getPath();
-
-        $response['content'] = [[
-            'detail' => 'The requested resource "' . $requestUri . '" was not found on this server.',
-            'pointer' => '#not-found',
-        ]];
-        $response['status'] = 404;
-        $response['title'] = 'Not found';
-        $response['type'] = '/errors/';
-
-        return $response;
-    }
-
     private function handleRegisterPost(RequestInterface $request, $response)
     {
         $input = $request->getBody()->getContents();
@@ -457,15 +412,5 @@ class ApiController
         $response['title'] = 'EnergyID Webhook';
 
         return $response;
-    }
-
-    private function splitUriPath(RequestInterface $request): array
-    {
-        $path = $request->getUri()->getPath();
-
-        $allParts = explode('/', $path);
-        $uriParts = array_filter($allParts);
-
-        return array_values($uriParts);
     }
 }
