@@ -4,27 +4,69 @@ namespace Meent\WebHook\Controller;
 
 use Psr\Http\Message\RequestInterface;
 
-class WebController
+class WebController extends AbstractController
 {
+    private const SUBJECT_CONTENT = 'content';
+
     final public function handleRequest(RequestInterface $request, $response)
     {
-        $requestUri = $request->getUri()->getPath();
         $acceptHeader = $request->getHeaderLine('Accept');
 
         $response['type'] = '/content/';
         $response['content'] = [];
-        switch ($requestUri) {
-            case '/':
-            case '/index.html':
+
+        $subject = $this->getRequestedSubject($request);
+
+        switch ($subject) {
+            case self::SUBJECT_ROOT:
+            case self::SUBJECT_CONTENT:
                 if (str_contains($acceptHeader, 'application/json')) {
                     $response['title'] = 'EnergyID Webhook';
                 } else {
-                    $response['content'] = file_get_contents(__DIR__ . '/../index.html');
+                    $contents = $this->getContents($subject);
+                    $response['content'] = $contents;
                 }
+            break;
 
+            default:
+                $response = $this->handleNotFound($request, $response);
             break;
         }
 
         return $response;
+    }
+
+    private function getContents(string $subject)
+    {
+        if ($subject === self::SUBJECT_ROOT || $subject = self::SUBJECT_CONTENT) {
+            $subject = 'index';
+        }
+
+        $contentPath = __DIR__ . '/../content/' . $subject . '.html';
+
+        $contents = file_get_contents($contentPath);
+
+        if ($contents === false) {
+            throw new \RuntimeException('Error: Failed to read content for "' . $subject . '"');
+        }
+
+        return $contents;
+    }
+
+    private function getRequestedSubject(RequestInterface $request)
+    {
+        $parts = $this->splitUriPath($request);
+
+        if (count($parts) === 0
+            || (count($parts) === 1 && $parts[0] = self::SUBJECT_CONTENT)
+        ) {
+            $subject = self::SUBJECT_ROOT;
+        } elseif (count($parts) === 1) {
+            $subject = $parts[0];
+        } else {
+            $subject = implode('/', $parts);
+        }
+
+        return $subject;
     }
 }
