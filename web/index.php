@@ -142,7 +142,7 @@ if ($outputType === 'html') {
                     JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) . '</code></pre>';
         }
 
-        $template = file_get_contents(__DIR__ . '/../src/template.html');
+        $template = file_get_contents(__DIR__ . '/../src/content/template.html');
 
         $content = vsprintf($template, [
             'footer' => '<p>'.$response['type'] ?? $request->getUri()->getPath().'</p>',
