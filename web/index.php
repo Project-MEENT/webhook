@@ -18,10 +18,6 @@ $filesystem = new Filesystem($adapter);
 
 // Create PSR Request and Response objects
 $request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
-$uriRoot = '';
-if (! empty($_SERVER['HTTP_HOST'])) {
-    $uriRoot = 'https://' . $_SERVER['HTTP_HOST'];
-}
 
 $response = [
     'headers' => [],
@@ -39,8 +35,16 @@ if (isset($queryParams['accept'])) {
     $acceptHeader = $queryParams['accept'];
     unset($queryParams['accept']);
     $request = $request
-        ->withQueryParams($queryParams)
-        ->withHeader('Accept', $acceptHeader);
+        ->withHeader('Accept', $acceptHeader)
+        ->withQueryParams($queryParams);
+}
+
+if (isset($queryParams['api-key'])) {
+    $apiKey = $queryParams['api-key'];
+    unset($queryParams['api-key']);
+    $request = $request
+        ->withHeader('Authorization', 'Bearer ' . $apiKey)
+        ->withQueryParams($queryParams);
 }
 
 $accept = array_map(static function ($value) {
@@ -70,14 +74,23 @@ switch ($rootPath) {
                 'detail' => 'Failed to write data: ' . $exception->getMessage(),
                 'pointer' => '#write-failed',
             ]];
-            $response['status'] = 500;
+            $response['status'] = 502;
             $response['title'] = 'Failed to write data';
+            $response['type'] = '/errors/';
+        } catch (\Exception $exception) {
+            $response['content'] = [[
+                'detail' => 'An unexpected error occurred: ' . $exception->getMessage(),
+                'pointer' => '#unexpected-error',
+            ]];
+            $response['status'] = 500;
+            $response['title'] = 'Unexpected Error';
             $response['type'] = '/errors/';
         }
     break;
 
     case '':
     case 'content':
+    case 'errors':
         $controller = new \Meent\WebHook\Controller\WebController();
         $response = $controller->handleRequest($request, $response);
     break;
@@ -97,7 +110,7 @@ $output = ob_get_clean();
 
 if ($output) {
     if ($outputType === 'html') {
-        $output = htmlentities(urldecode($output));
+        $output = urldecode($output);
     }
 
     $response['content'] = [[
