@@ -48,7 +48,7 @@ class WebController extends AbstractController
 
     private function getContents(string $subject)
     {
-        if ($subject === self::SUBJECT_ROOT || $subject = self::SUBJECT_CONTENT) {
+        if ($subject === self::SUBJECT_ROOT || $subject === self::SUBJECT_CONTENT) {
             $subject = 'index';
         }
 
@@ -68,7 +68,7 @@ class WebController extends AbstractController
         $parts = $this->splitUriPath($request);
 
         if (count($parts) === 0
-            || (count($parts) === 1 && $parts[0] = self::SUBJECT_CONTENT)
+            || (count($parts) === 1 && $parts[0] === self::SUBJECT_CONTENT)
         ) {
             $subject = self::SUBJECT_ROOT;
         } elseif (count($parts) === 1) {
