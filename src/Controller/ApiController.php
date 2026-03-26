@@ -157,7 +157,7 @@ class ApiController extends AbstractController
             . '://'
             . $url['host']
             . (array_key_exists('port', $url) ? ':'.$url['port'] : '')
-            . rtrim($url['path'], '/')
+            . (array_key_exists('path', $url) ? rtrim($url['path'], '/'):'')
         ;
         $webId = strtolower($webId);
 
@@ -382,7 +382,6 @@ class ApiController extends AbstractController
             switch ($requestMethod) {
                 case 'GET':
                 case 'PATCH':
-                case 'PUT':
                     $response = $this->handleMethodNotAllowed($response, $request, $allowedMethods);
                 break;
 
@@ -393,6 +392,11 @@ class ApiController extends AbstractController
 
                 case 'POST':
                     $response = $this->handleRegisterPost($request, $response);
+                break;
+
+                case 'PUT':
+                    // @TODO: Add PUT method to update WebID (requires API key)
+                    $response = $this->handleMethodNotAllowed($response, $request, $allowedMethods);
                 break;
             }
         } else {
