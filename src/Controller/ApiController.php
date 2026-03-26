@@ -71,7 +71,7 @@ class ApiController
             $response['status'] = 400;
             $response['title'] = 'Invalid Authorization header';
             $response['type'] = '/errors/';
-        } elseif ($this->getFilesystem()->fileExists('keys/' . substr($auth, 7) . '.key') === false) {
+        } elseif ($this->filesystem->fileExists('keys/' . substr($auth, 7) . '.key') === false) {
             $response['content'] = [[
                 'detail' => 'Invalid API key',
                 'pointer' => '#invalid-api-key',
@@ -385,20 +385,32 @@ class ApiController
             $response['title'] = 'Invalid URL';
             $response['type'] = '/errors/';
         } else {
-            $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
             $webIdHash = $this->createWebIdHash($webId);
+            $exists = $this->filesystem->directoryExists($webIdHash);
 
-            $filePath = 'keys/' . $apiKey . '.key';
-            $this->filesystem->write($filePath, $webId);
+            if ($exists) {
+                $response['content'] = [[
+                    'detail' => 'The provided WebID "' . $webId . '" has already been registered, use PUT for updates',
+                    'pointer' => '#webid-already-registered',
+                ]];
+                $response['status'] = 409;
+                $response['title'] = 'WebID already registered';
+                $response['type'] = '/errors/';
+            } else {
+                $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
 
-            $this->filesystem->createDirectory($webIdHash);
+                $filePath = 'keys/' . $apiKey . '.key';
+                $this->filesystem->write($filePath, $webId);
 
-            $response['content'] = [
-                'api_key' => $apiKey,
-                'webid'   => $webId,
-            ];
-            $response['status'] = 201;
-            $response['title'] = 'WebID registered';
+                $this->filesystem->createDirectory($webIdHash);
+
+                $response['content'] = [
+                    'api_key' => $apiKey,
+                    'webid'   => $webId,
+                ];
+                $response['status'] = 201;
+                $response['title'] = 'WebID registered';
+            }
         }
 
         return $response;
