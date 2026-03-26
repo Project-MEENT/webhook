@@ -4,7 +4,7 @@ namespace Meent\WebHook\Controller;
 
 use Psr\Http\Message\RequestInterface;
 
-class WebController extends AbstractController
+class DocsController extends AbstractController
 {
     private const SUBJECT_CONTENT = 'content';
     private const SUBJECT_ERROR = 'errors';

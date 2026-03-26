@@ -91,7 +91,7 @@ switch ($rootPath) {
     case '':
     case 'content':
     case 'errors':
-        $controller = new \Meent\WebHook\Controller\WebController();
+        $controller = new \Meent\WebHook\Controller\DocsController();
         $response = $controller->handleRequest($request, $response);
     break;
 
