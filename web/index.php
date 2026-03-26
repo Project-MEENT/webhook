@@ -53,14 +53,14 @@ $accept = array_map(static function ($value) {
 }, explode(',', $acceptHeader));
 
 switch ($accept[0]) {
-    case 'application/json':
-        $outputType = 'json';
-    break;
-
     case 'application/xhtml+xml':
     case 'text/html':
-    default:
         $outputType = 'html';
+    break;
+
+    case 'application/json':
+    default:
+        $outputType = 'json';
     break;
 }
 
