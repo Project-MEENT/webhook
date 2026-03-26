@@ -89,9 +89,9 @@ switch ($rootPath) {
     break;
 
     case '':
-    case 'content':
+    case 'docs':
     case 'errors':
-        $controller = new \Meent\WebHook\Controller\DocsController();
+        $controller = new \Meent\WebHook\Controller\DocsController(new \League\CommonMark\GithubFlavoredMarkdownConverter());
         $response = $controller->handleRequest($request, $response);
     break;
 

@@ -16,6 +16,7 @@
         "ext-json": "*",
         "ext-mbstring": "*",
         "laminas/laminas-diactoros": "^2.26 | ^3.8",
+        "league/commonmark": "^2.8",
         "league/flysystem": "^3.0"
     },
     "require-dev": {

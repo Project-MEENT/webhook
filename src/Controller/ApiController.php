@@ -413,7 +413,7 @@ class ApiController extends AbstractController
             . ($request->getUri()->getPort() ? ':' . $request->getUri()->getPort() : '');
 
         $response['content'] = "For more information, visit $uriRoot";
-        $response['title'] = 'EnergyID Webhook';
+        $response['title'] = 'MEENT Webhook';
 
         return $response;
     }
