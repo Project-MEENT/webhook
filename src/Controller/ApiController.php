@@ -2,24 +2,24 @@
 
 namespace Meent\WebHook\Controller;
 
-use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemOperator;
 use Psr\Http\Message\RequestInterface;
 
 class ApiController
 {
-    private const API_DATA = 'data';
-    private const API_REGISTER = 'register';
-    private const API_ROOT = '__ROOT__';
-
     private const AVAILABLE_VERSIONS = [
         'v0.1', // No-op
         'v0.2', // Store without API key
         'v0.3', // Store with registered API key
     ];
 
-    private Filesystem $filesystem;
+    private const SUBJECT_DATA = 'data';
+    private const SUBJECT_REGISTER = 'register';
+    private const SUBJECT_ROOT = '__ROOT__';
 
-    final public function __construct(Filesystem $filesystem)
+    private FilesystemOperator $filesystem;
+
+    final public function __construct(FilesystemOperator $filesystem)
     {
         $this->filesystem = $filesystem;
     }
@@ -31,16 +31,15 @@ class ApiController
         $subject = $this->getRequestedSubject($request);
 
         switch ($subject) {
-            case self::API_DATA:
+            case self::SUBJECT_DATA:
                 $response = $this->handleDataRequest($request, $response);
             break;
 
-            case self::API_REGISTER:
+            case self::SUBJECT_REGISTER:
                 $response = $this->handleRegisterRequest($request, $response);
             break;
 
-            case '':
-            case self::API_ROOT:
+            case self::SUBJECT_ROOT:
                 $response = $this->handleRootRequest($request, $response);
             break;
 
@@ -79,14 +78,14 @@ class ApiController
         if ($parts[0] !== 'api') {
             throw new \Exception('Invalid path');
         } elseif (count($parts) === 1) {
-            $subject = self::API_ROOT;
+            $subject = self::SUBJECT_ROOT;
         } else {
             $versions = self::AVAILABLE_VERSIONS;
             $versions[] = 'latest';
             $versions[] = 'v0';
 
             if (in_array($parts[1], $versions)) {
-                $subject = $parts[2] ?? self::API_ROOT;
+                $subject = $parts[2] ?? self::SUBJECT_ROOT;
             } else {
                 $subject = $parts[1];
             }
@@ -141,7 +140,7 @@ class ApiController
         switch ($requestMethod) {
             case 'GET':
                 if ($version >= 0.2) {
-                    $response = $this->handleDateGet($request, $response);
+                    $response = $this->handleDataGet($request, $response);
                     break;
                 }
             case 'PATCH':
@@ -164,7 +163,7 @@ class ApiController
         return $response;
     }
 
-    private function handleDateGet(RequestInterface $request, $response)
+    private function handleDataGet(RequestInterface $request, $response)
     {
         $filePath = $this->getRequestedObject($request);
 
@@ -260,7 +259,7 @@ class ApiController
 
             // Check which Solid Pod to write to
             if (isset($apiKey)) {
-                $webid = $this->filesystem->read('keys/' . $apiKey . '.key');
+                $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
             }
 
             // Connect to Solid Pod (using ? see Solid Specs)
@@ -272,7 +271,7 @@ class ApiController
                 if ($version >= 0.3) {
                     // When data is received, it is stored in `/{webid-hash}/{timestamp}.{id}.data`
                     $filePath = vsprintf("%s/%s.%s.data", [
-                        'webIdHash' => hash('sha256', $webid),
+                        'webIdHash' => hash('sha256', $webId),
                         'timestamp' => date('Ymd.His'),
                         $id
                     ]);
@@ -341,7 +340,7 @@ class ApiController
             $response['status'] = 422;
             $response['title'] = 'No data received';
             $response['type'] = '/errors/';
-        } else if (filter_var($webId, FILTER_VALIDATE_URL) === false) {
+        } elseif (filter_var($webId, FILTER_VALIDATE_URL) === false) {
             $response['content'] = [[
                 'detail' => 'Provided WebID "' . $webId . '" is not a valid URL',
                 'pointer' => '#invalid-url',
