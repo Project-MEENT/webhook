@@ -145,9 +145,12 @@ if ($outputType === 'html') {
         $template = file_get_contents(__DIR__ . '/../src/template.html');
 
         $content = vsprintf($template, [
-            $response['title'] ?? 'Response',
-            $body,
-            $response['type'] ?? $request->getUri()->getPath(),
+            'footer' => '<p>'.$response['type'] ?? $request->getUri()->getPath().'</p>',
+            'header' => 'Webhook to write data from a P1 dongle to a Solid Pod.',
+            'main' => '<section><h2>' . ($response['title'] ?? 'Response') . '</h2>' . $body. '</section>',
+            'script' => '',
+            'style' => 'h2 {width: 100%;}',
+            'title' => 'MEENT ️Web Hook',
         ]);
     }
 } else {
@@ -156,20 +159,20 @@ if ($outputType === 'html') {
     if (empty($response['type']) || $response['type'] === '/errors/') {
         $response['title'] = empty($response['title']) ? 'Error' : $response['title'];
         $response['headers']['Content-Type'] = ['application/problem+json'];
-        $contentType = 'errors';
+        $key = 'errors';
     } else {
-        $contentType = 'data';
+        $key = 'data';
     }
 
     $body = [
-        'type' => $response['type'] ?? '/' . $rootPath . '/',
+        'type' => $response['type'] ?? '/errors/',
         'title' => $response['title'] ?: $response['type'],
-        $contentType => $response['content'],
+        $key => $response['content'],
     ];
 
     try {
         $content = json_encode($body, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
-    } catch (JsonException $e) {
+    } catch (\JsonException $e) {
         $body = <<<'JSON'
         {
             "type": "%s",
