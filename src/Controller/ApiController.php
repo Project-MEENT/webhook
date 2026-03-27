@@ -289,12 +289,8 @@ class ApiController extends AbstractController
             $response['title'] = 'No data received';
             $response['type'] = '/errors/';
         } else {
-            try {
-                $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                // Data is not JSON, write as-is
-                $data = $input;
-            }
+            // Data is written as-is
+            $data = $input;
 
             // Check which Solid Pod to write to
             if (isset($apiKey)) {
