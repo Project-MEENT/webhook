@@ -1,18 +1,20 @@
-<!DOCTYPE html>
+<!doctype html>
 <html color-mode="user" lang="en">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://cdn.jsdelivr.net/npm/mvp.css@1.17.2/mvp.min.css" rel="stylesheet">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<link href="https://cdn.jsdelivr.net/npm/mvp.css@1.17.3/mvp.min.css" rel="stylesheet">
+
 <style>
     title {
         display: inline;
     }
-    h2 {
+
+    main h2 {
         width: 100%;
     }
 </style>
 <header>
-    <h1><title>🕸️Web Hook🪝</title></h1>
+    <h1><title>MEENT ️Webhook</title></h1>
     <p>
         This is a simple webhook that can be used by the <a href="https://smart-stuff.nl/">Smart-Stuff</a>
         P1 dongle to write data to a Solid Pod.
@@ -40,7 +42,7 @@
                             <option value="v0.2">v0.2</option>
                             <option value="v0.3">v0.3</option>
                         </optgroup>
-                        <option value="" selected>latest</option>
+                        <option selected value="">latest</option>
                     </select>
                 </label>
                 <details>
@@ -63,7 +65,7 @@
                         <dt>v0.5</dt>
                         <dd>This version stores received data converted to Linked Data in a Solid mapped to a WebId</dd>
                     </dl>
-                    </details>
+                </details>
             </fieldset>
             <fieldset>
                 <legend>P1 Data (JSON format)</legend>
@@ -83,7 +85,7 @@
                 <label>
                     <select name="api-version">
                         <option value="v0.3">v0.3</option>
-                        <option value="" selected>latest</option>
+                        <option selected value="">latest</option>
                     </select>
                 </label>
             </fieldset>
@@ -127,8 +129,13 @@
                 'Content-Type': isRegisterRequest ? 'text/plain' : 'application/json',
             }
 
+            let apiKey
             form.querySelectorAll('[data-js="headers"] input[name]').forEach(input => {
                 headers[input.name] = input.value
+
+                if (input.name === 'Authorization') {
+                    apiKey = input.value.trim().split(' ')[1]
+                }
             })
 
             let url = form.action || window.location.href
@@ -155,9 +162,14 @@
                     const json = JSON.parse(responseText)
 
                     // Add a link to the data
-                    if (json.title && json.title.startsWith('Records written to ')) {
-                        const dataUrl = json.title.split(' ')[3]
-                        output.insertAdjacentHTML('afterend', `<a data-js="response-link" href="/api/data/${dataUrl}">See data</a>`)
+                    if (response.headers.get('Location')) {
+                        let url = new URL(response.headers.get('Location'))
+
+                        if (apiKey) {
+                            url.searchParams.set('api-key', apiKey)
+                        }
+
+                        output.insertAdjacentHTML('afterend', `<a data-js="response-link" href="${url.toString()}">View stored data</a>`)
                     }
 
                     // Check if there is an RFC-9457 compliant error
