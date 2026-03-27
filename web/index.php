@@ -97,7 +97,7 @@ switch ($rootPath) {
 
     default:
         $response['content'] = [[
-            'detail' => 'The requested resource "' . $path . '" was not found on this server.',
+            'detail' => "The requested resource '$path' was not found on this server.",
             'pointer' => '#not-found',
         ]];
         $response['status'] = 404;

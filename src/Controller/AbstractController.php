@@ -48,7 +48,7 @@ abstract class AbstractController
 
         $response['content'] = [
             [
-                'detail' => 'The requested resource "' . $requestUri . '" was not found on this server.',
+                'detail' => "The requested resource '$requestUri' was not found on this server.",
                 'pointer' => '#not-found',
             ]
         ];

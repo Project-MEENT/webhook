@@ -67,7 +67,7 @@ class ApiController extends AbstractController
             $response['type'] = '/errors/';
         } elseif (! str_starts_with($auth, 'Bearer ')) {
             $response['content'] = [[
-                'detail' => 'Invalid Authorization header format, expected "Bearer {api-key}"',
+                'detail' => "Invalid Authorization header format, expected 'Bearer {api-key}'",
                 'pointer' => '#invalid-auth-header',
             ]];
             $response['status'] = 400;
@@ -229,7 +229,7 @@ class ApiController extends AbstractController
             $response['type'] = '/errors/';
         } elseif (! $this->filesystem->fileExists($filePath)) {
             $response['content'] = [[
-                'detail' => "The requested resource '" . $filePath . "' was not found on this server.",
+                'detail' => "The requested resource '$filePath' was not found on this server.",
                 'pointer' => '#not-found',
             ]];
             $response['status'] = 404;
@@ -336,7 +336,7 @@ class ApiController extends AbstractController
             $response['type'] = '/errors/';
         } elseif (filter_var($webId, FILTER_VALIDATE_URL) === false) {
             $response['content'] = [[
-                'detail' => 'Provided WebID "' . $webId . '" is not a valid URL',
+                'detail' => "Provided WebID '$webId' is not a valid URL",
                 'pointer' => '#invalid-url',
             ]];
             $response['status'] = 422;
@@ -348,7 +348,7 @@ class ApiController extends AbstractController
 
             if ($exists) {
                 $response['content'] = [[
-                    'detail' => 'The provided WebID "' . $webId . '" has already been registered, use PUT for updates',
+                    'detail' => "The provided WebID '$webId' has already been registered, use PUT for updates",
                     'pointer' => '#webid-already-registered',
                 ]];
                 $response['status'] = 409;
