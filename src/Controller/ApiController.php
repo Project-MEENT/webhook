@@ -88,6 +88,13 @@ class ApiController extends AbstractController
         return $response;
     }
 
+    private function getBaseUrl(RequestInterface $request)
+    {
+        return $request->getUri()->getScheme() . '://'
+            . $request->getUri()->getHost()
+            . ($request->getUri()->getPort() ? ':' . $request->getUri()->getPort() : '');
+    }
+
     private function getLatestVersion()
     {
         $versions = self::AVAILABLE_VERSIONS;
@@ -411,9 +418,7 @@ class ApiController extends AbstractController
 
     private function handleRootRequest(RequestInterface $request, $response)
     {
-        $uriRoot = $request->getUri()->getScheme() . '://'
-            . $request->getUri()->getHost()
-            . ($request->getUri()->getPort() ? ':' . $request->getUri()->getPort() : '');
+        $uriRoot = $this->getBaseUrl($request);
 
         $response['content'] = "For more information, visit $uriRoot";
         $response['title'] = 'MEENT Webhook';
