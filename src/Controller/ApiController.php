@@ -313,9 +313,16 @@ class ApiController extends AbstractController
                     $filePath = "$timestamp.$id.data";
                 }
 
-                $message .= ' to ' . $filePath;
-
                 $this->filesystem->write($filePath, $data);
+
+                if ($version >= 0.3) {
+                    $url = $this->getBaseUrl($request) . '/api/data/' . $filePath;
+                    $data = null;
+                    // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
+                    $response['headers']['Location'] = [$url];
+                } else {
+                    $message .= ' to ' . $filePath;
+                }
             }
 
             // Return success
