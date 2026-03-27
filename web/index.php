@@ -139,7 +139,7 @@ if ($outputType === 'html') {
             $body .= '</ul>';
         } else {
             $body = '<pre><code>' . htmlentities(json_encode($content,
-                    JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) . '</code></pre>';
+                    JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)) . '</code></pre>';
         }
 
         $template = file_get_contents(__DIR__ . '/../src/content/template.html');
@@ -171,7 +171,7 @@ if ($outputType === 'html') {
     ];
 
     try {
-        $content = json_encode($body, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
+        $content = json_encode($body, JSON_PRETTY_PRINT  | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
     } catch (\JsonException $e) {
         $body = <<<'JSON'
         {
