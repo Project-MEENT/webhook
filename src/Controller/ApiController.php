@@ -53,7 +53,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function checkAuthorization($request, $response)
+    private function checkAuthorization(RequestInterface $request, $response)
     {
         $auth = $request->getHeaderLine('Authorization');
 
@@ -245,7 +245,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function handleDataPost($request, $response, $input)
+    private function handleDataPost(RequestInterface $request, $response, $input)
     {
         $version = $this->getRequestedVersion($request);
 
