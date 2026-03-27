@@ -145,13 +145,19 @@ class ApiController extends AbstractController
         if ($parts[0] !== 'api') {
             throw new \Exception('Invalid path');
         } elseif (
-            count($parts) === 1
-            || ($parts[1] === 'v0' || $parts[1] === 'latest')
-            || (! preg_match('/^v[0-9]+\.[0-9]+$/', $parts[1]))
+            (count($parts) === 1 && ! $request->hasHeader('API-Version'))
+            || (count($parts) > 1 && ($parts[1] === 'v0' || $parts[1] === 'latest'))
         ) {
             $version = $this->getLatestVersion();
-        } elseif (in_array($parts[1], self::AVAILABLE_VERSIONS)) {
+        } elseif (count($parts) > 1 && in_array($parts[1], self::AVAILABLE_VERSIONS)) {
             $version = $parts[1];
+        } elseif (
+            ($request->hasHeader('API-Version') && in_array($request->getHeaderLine('API-Version'), self::AVAILABLE_VERSIONS))
+            || ($request->hasHeader('API Version') && in_array($request->getHeaderLine('API Version'), self::AVAILABLE_VERSIONS))
+        ) {
+            $version = ltrim($request->getHeaderLine('API-Version'), 'v');
+        } elseif (in_array($parts[1], [self::SUBJECT_DATA, self::SUBJECT_REGISTER])) {
+            $version = $this->getLatestVersion();
         } else {
             throw new \Exception('Invalid version');
         }
