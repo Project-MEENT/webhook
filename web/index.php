@@ -167,8 +167,11 @@ if ($outputType === 'html') {
     $body = [
         'type' => $response['type'] ?? '/errors/',
         'title' => $response['title'] ?: $response['type'],
-        $key => $response['content'],
     ];
+
+    if ($response['content'] !== null) {
+        $body[$key] = $response['content'];
+    }
 
     try {
         $content = json_encode($body, JSON_PRETTY_PRINT  | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
