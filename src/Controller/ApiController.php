@@ -28,6 +28,9 @@ class ApiController extends AbstractController
         $response['type'] = '/api/';
 
         $subject = $this->getRequestedSubject($request);
+        $version = $this->getRequestedVersion($request);
+
+        $response['headers']['API-Version'] = ["v$version"];
 
         switch ($subject) {
             case self::SUBJECT_DATA:
