@@ -15,9 +15,14 @@
         "php": "^8.0",
         "ext-json": "*",
         "ext-mbstring": "*",
+        "ext-openssl": "*",
+        "ext-pcre": "*",
+        "facile-it/php-openid-client": " ^0.3.5 | ^0.4",
+        "guzzlehttp/guzzle": "^7.10",
         "laminas/laminas-diactoros": "^2.26 | ^3.8",
         "league/commonmark": "^2.8",
-        "league/flysystem": "^3.0"
+        "league/flysystem": "^3.0",
+        "sweetrdf/easyrdf": "^1.19"
     },
     "require-dev": {
     },
