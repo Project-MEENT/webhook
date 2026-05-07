@@ -1,12 +1,4 @@
 <?php
-/**
- * @noinspection PhpRedundantCatchClauseInspection
- * @noinspection DuplicatedCode
- * @noinspection PhpMissingReturnTypeInspection
- * @noinspection PhpMultipleClassDeclarationsInspection
- * @noinspection PhpPossiblePolymorphicInvocationInspection
- * @noinspection ReturnTypeCanBeDeclaredInspection
- */
 
 namespace Meent\WebHook\Solid;
 

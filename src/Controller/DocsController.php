@@ -17,7 +17,7 @@ class DocsController extends AbstractController
         $this->converter = $converter;
     }
 
-    final public function handleRequest(RequestInterface $request, $response)
+    final public function handleRequest(RequestInterface $request, array $response)
     {
         $converter = $this->converter;
 
@@ -45,7 +45,11 @@ class DocsController extends AbstractController
                         'header' => $converter->convert($readmeContent['description']),
                         'main' => '<section>' . $converter->convert($readmeContent['content']) . '</section>',
                         'script' => '',
-                        'style' => 'h2 {width: 100%;}',
+                        'style' => <<<CSS
+                            title { display: inline; }
+                            h2 { width: 100%; }
+CSS
+,
                         'title' => $readmeContent['title'],
                     ]);
 

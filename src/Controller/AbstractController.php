@@ -55,7 +55,7 @@ abstract class AbstractController
         return $response;
     }
 
-    final protected function handleNotFound(RequestInterface $request, $response)
+    final protected function handleNotFound(RequestInterface $request, array $response)
     {
         $requestUri = $request->getUri()->getPath();
 

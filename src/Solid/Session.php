@@ -1,9 +1,4 @@
 <?php
-/**
- * @noinspection PhpMissingReturnTypeInspection
- * @noinspection ReturnTypeCanBeDeclaredInspection
- */
-
 
 namespace Meent\WebHook\Solid;
 

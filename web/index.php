@@ -128,7 +128,7 @@ if ($output) {
     $response['type'] = '/errors/';
 }
 
-$content = $response['content'];
+$content = $response['content'] ?? null;
 
 if ($outputType === 'html') {
     $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];

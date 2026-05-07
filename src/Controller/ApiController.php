@@ -130,7 +130,7 @@ class ApiController extends AbstractController
         $parts = $this->splitUriPath($request);
 
         if ($parts[0] !== 'api') {
-            throw new \Exception('Invalid path');
+            throw new Exception('Invalid path');
         } elseif (count($parts) === 1) {
             $subject = self::SUBJECT_ROOT;
         } else {
@@ -153,7 +153,7 @@ class ApiController extends AbstractController
         $parts = $this->splitUriPath($request);
 
         if ($parts[0] !== 'api') {
-            throw new \Exception('Invalid path');
+            throw new Exception('Invalid path');
         } elseif (
             (count($parts) === 1 && ! $request->hasHeader('API-Version'))
             || (count($parts) > 1 && ($parts[1] === 'v0' || $parts[1] === 'latest'))
@@ -171,7 +171,7 @@ class ApiController extends AbstractController
         } elseif (in_array($parts[1], [self::SUBJECT_DATA, self::SUBJECT_REGISTER])) {
             $version = $this->getLatestVersion();
         } else {
-            throw new \Exception('Invalid version');
+            throw new Exception('Invalid version');
         }
 
         return (float) ltrim($version, 'v');
@@ -184,9 +184,8 @@ class ApiController extends AbstractController
         $webId = $url['scheme'] . ($url['scheme'] === 'http' ? 's' : '')
             . '://'
             . $url['host']
-            . (array_key_exists('port', $url) ? ':'.$url['port'] : '')
-            . (array_key_exists('path', $url) ? rtrim($url['path'], '/'):'')
-        ;
+            . (array_key_exists('port', $url) ? ':' . $url['port'] : '')
+            . (array_key_exists('path', $url) ? rtrim($url['path'], '/') : '');
         $webId = strtolower($webId);
 
         return hash('sha1', $webId);
@@ -325,7 +324,7 @@ CSS
         if ($version >= 0.3) {
             $authError = $this->checkAuthorization($request, $response);
 
-            if($authError !== []) {
+            if ($authError !== []) {
                 return $authError;
             }
         }
@@ -368,7 +367,7 @@ CSS
             //      Authorization: Bearer {api-key}
             $authError = $this->checkAuthorization($request, $response);
 
-            if($authError !== []) {
+            if ($authError !== []) {
                 return $authError;
             } else {
                 $auth = $request->getHeaderLine('Authorization');
@@ -409,7 +408,7 @@ CSS
                     $filePath = vsprintf("%s/%s.%s.data", [
                         'webIdHash' => $this->createWebIdHash($webId),
                         'timestamp' => date('Ymd.His'),
-                        $id
+                        $id,
                     ]);
                 } else {
                     $timestamp = date('Ymd/His');
@@ -481,7 +480,7 @@ CSS
 
                 $response['content'] = [
                     'api_key' => $apiKey,
-                    'webid'   => $webId,
+                    'webid' => $webId,
                 ];
                 $response['status'] = 201;
                 $response['title'] = 'WebID registered';
