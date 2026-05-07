@@ -7,7 +7,13 @@ use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+ini_set('session.serialize_handler', 'php_serialize');
 ob_start();
+session_set_save_handler(new \SessionHandler(), true);
+session_start();
 
 require_once __DIR__ . '/../vendor/autoload.php';
 

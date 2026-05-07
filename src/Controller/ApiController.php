@@ -2,7 +2,10 @@
 
 namespace Meent\WebHook\Controller;
 
+use GuzzleHttp\Psr7\Response;
 use League\Flysystem\FilesystemOperator;
+use Meent\WebHook\Exception;
+use Meent\WebHook\Solid\SolidClient;
 use Psr\Http\Message\RequestInterface;
 
 class ApiController extends AbstractController
@@ -11,8 +14,10 @@ class ApiController extends AbstractController
         'v0.1', // No-op
         'v0.2', // Store without API key
         'v0.3', // Store with registered API key
+        'v0.4', // Provide consent
     ];
 
+    private const SUBJECT_CONSENT = 'consent';
     private const SUBJECT_DATA = 'data';
     private const SUBJECT_REGISTER = 'register';
 
@@ -23,7 +28,7 @@ class ApiController extends AbstractController
         $this->filesystem = $filesystem;
     }
 
-    final public function handleRequest(RequestInterface $request, $response)
+    final public function handleRequest(RequestInterface $request, array $response)
     {
         $response['type'] = '/api/';
 
@@ -33,6 +38,11 @@ class ApiController extends AbstractController
         $response['headers']['API-Version'] = ["v$version"];
 
         switch ($subject) {
+            case self::SUBJECT_CONSENT:
+                if ($version >= 0.4) {
+                    $response = $this->handleConsentRequest($request, $response);
+                }
+            break;
             case self::SUBJECT_DATA:
                 $response = $this->handleDataRequest($request, $response);
             break;
@@ -147,6 +157,8 @@ class ApiController extends AbstractController
         } elseif (
             (count($parts) === 1 && ! $request->hasHeader('API-Version'))
             || (count($parts) > 1 && ($parts[1] === 'v0' || $parts[1] === 'latest'))
+            || (count($parts) > 1 && in_array($parts[1],
+                    [self::SUBJECT_DATA, self::SUBJECT_REGISTER, self::SUBJECT_CONSENT]))
         ) {
             $version = $this->getLatestVersion();
         } elseif (count($parts) > 1 && in_array($parts[1], self::AVAILABLE_VERSIONS)) {
@@ -178,6 +190,95 @@ class ApiController extends AbstractController
         $webId = strtolower($webId);
 
         return hash('sha1', $webId);
+    }
+
+    private function handleConsentRequest(RequestInterface $request, $response)
+    {
+        $requestMethod = $request->getMethod();
+        $queryParams = $request->getQueryParams();
+        $allowedMethods = ['GET', 'POST'];
+
+        switch ($requestMethod) {
+            case 'GET':
+            case 'POST':
+                // @FIXME: Try/Catch + Error handling
+
+                $isRedirect = isset($request->getQueryParams()['code']) || isset($request->getQueryParams()['error']);
+
+                if ($isRedirect || $requestMethod === 'POST' || isset($request->getQueryParams()['webid'])) {
+                    $solidClient = new SolidClient();
+                    $responseObject = new Response();
+
+                    $responseObject = $solidClient->handleRequest($request, $responseObject);
+                    $responseObject->getBody()->rewind();
+                    $contents = $responseObject->getBody()->getContents();
+
+                    if ($contents !== '') {
+                        $template = $this->getContents('template');
+                        $response['content'] = vsprintf($template, [
+                            'footer' => '',
+                            'header' => '<p>Your P1 dongle can now be connected to your Solid Pod</p>',
+                            'main' => "<section>$contents</section>",
+                            'script' => '',
+                            'style' => <<<CSS
+                                            title { display: inline; }
+                                            h2 { width: 100%; }
+                    CSS
+                            ,
+                            'title' => 'Provide consent',
+                        ]);
+                    }
+
+                    $response['headers'] = array_merge($response['headers'], $responseObject->getHeaders());
+                    $response['status'] = $responseObject->getStatusCode();
+                } else {
+                    // Show Form
+                    $template = $this->getContents('template');
+
+                    $response['content'] = vsprintf($template, [
+                        'footer' => '',
+                        'header' => '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
+                        'main' => <<<'HTML'
+                        <section>
+                            <form enctype="application/x-www-form-urlencoded" method="POST">
+                            <fieldset><legend>WebID URL</legend>
+                                <label>Please provide the URL of your Solid WebID:
+                                    <input
+                                        name="webid"
+                                        placeholder="https://idp.example.com/"
+                                        required
+                                        type="url"
+                                        value=""
+                                    />
+                                </label>
+                            </fieldset>
+                                <button>Connect</button>
+                            </form>
+                        </section>
+HTML,
+                        'script' => '',
+                        'style' => <<<CSS
+                        title { display: inline; }
+                        h2 { width: 100%; }
+CSS
+                        ,
+                        'title' => 'Provide consent',
+                    ]);
+                }
+            break;
+
+            case 'HEAD':
+            case 'OPTIONS':
+                $response = $this->handleAllowedHttpMethods($response, $allowedMethods);
+            break;
+
+            case 'PATCH':
+            case 'PUT':
+                $response = $this->handleMethodNotAllowed($response, $request, $allowedMethods);
+            break;
+        }
+
+        return $response;
     }
 
     private function handleDataRequest(RequestInterface $request, $response)
