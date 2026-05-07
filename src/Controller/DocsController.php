@@ -57,7 +57,7 @@ class DocsController extends AbstractController
                 if (str_contains($acceptHeader, 'application/json')) {
                     $response['title'] = 'MEENT Webhook';
                 } else {
-                    $contents = $this->getContents($subject);
+                    $contents = $this->getContents('index');
                     $response['content'] = $contents;
                 }
             break;
@@ -98,23 +98,6 @@ class DocsController extends AbstractController
         }
 
         return $response;
-    }
-
-    private function getContents(string $subject)
-    {
-        if ($subject === self::SUBJECT_ROOT || $subject === self::SUBJECT_CONTENT) {
-            $subject = 'index';
-        }
-
-        $contentPath = __DIR__ . '/../content/' . $subject . '.html';
-
-        $contents = file_get_contents($contentPath);
-
-        if ($contents === false) {
-            throw new \RuntimeException('Error: Failed to read content for "' . $subject . '"');
-        }
-
-        return $contents;
     }
 
     private function getRequestedSubject(RequestInterface $request)

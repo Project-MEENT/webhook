@@ -2,14 +2,27 @@
 
 namespace Meent\WebHook\Controller;
 
-use League\Flysystem\FilesystemOperator;
+use Meent\WebHook\Exception\RuntimeException;
 use Psr\Http\Message\RequestInterface;
 
 abstract class AbstractController
 {
     protected const SUBJECT_ROOT = '__ROOT__';
 
-    abstract public function handleRequest(RequestInterface $request, $response);
+    abstract public function handleRequest(RequestInterface $request, array $response);
+
+    protected function getContents(string $subject)
+    {
+        $contentPath = __DIR__ . '/../content/' . $subject . '.html';
+
+        $contents = file_get_contents($contentPath);
+
+        if ($contents === false) {
+            throw new RuntimeException('Error: Failed to read content for "' . $subject . '"');
+        }
+
+        return $contents;
+    }
 
     final protected function handleAllowedHttpMethods($response, $allowedMethods)
     {
