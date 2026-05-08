@@ -2,9 +2,6 @@
 
 namespace Meent\WebHook\Solid;
 
-use League\Flysystem\FilesystemException;
-use League\Flysystem\FilesystemOperator;
-
 class Utility
 {
     final public static function base64UrlDecode($encodedData)
@@ -45,33 +42,5 @@ class Utility
         }
 
         return $claims;
-    }
-
-    /**
-     * @throws FilesystemException
-     * @throws \JsonException
-     */
-    final public static function saveOfflineGrant(Session $session, FilesystemOperator $filesystem, $issuerHash)
-    {
-        $snapshot = [
-            DpopProofFactory::SESSION_KEY => $session->get(DpopProofFactory::SESSION_KEY),
-            'saved_at' => time(),
-            'solid_access_token' => $session->get('solid_access_token'),
-            'solid_refresh_token' => $session->get('solid_refresh_token'),
-            'solid_resource_url' => $session->get('solid_resource_url'),
-            'solid_storage_root' => $session->get('solid_storage_root'),
-            'solid_token_expiry' => $session->get('solid_token_expiry'),
-            'solid_webid' => $session->get('solid_webid'),
-        ];
-
-        $grant = array_filter($snapshot, static function ($value): bool {
-            return $value !== null && $value !== '';
-        });
-
-        // @FIXME: This grant is issuer AND _webid_ specific. ADD WEBID!
-        $path = $issuerHash . '/offline-grant.json';
-        $encode = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-
-        $filesystem->write($path, $encode);
     }
 }
