@@ -10,6 +10,12 @@ use Psr\Http\Message\RequestInterface;
 
 class ApiController extends AbstractController
 {
+    const AVAILABLE_SUBJECTS = [
+        self::SUBJECT_CONSENT,
+        self::SUBJECT_DATA,
+        self::SUBJECT_REGISTER,
+    ];
+
     private const AVAILABLE_VERSIONS = [
         'v0.1', // No-op
         'v0.2', // Store without API key
@@ -157,8 +163,7 @@ class ApiController extends AbstractController
         } elseif (
             (count($parts) === 1 && ! $request->hasHeader('API-Version'))
             || (count($parts) > 1 && ($parts[1] === 'v0' || $parts[1] === 'latest'))
-            || (count($parts) > 1 && in_array($parts[1],
-                    [self::SUBJECT_DATA, self::SUBJECT_REGISTER, self::SUBJECT_CONSENT]))
+            || (count($parts) > 1 && in_array($parts[1], self::AVAILABLE_SUBJECTS, true))
         ) {
             $version = $this->getLatestVersion();
         } elseif (count($parts) > 1 && in_array($parts[1], self::AVAILABLE_VERSIONS)) {
@@ -168,7 +173,7 @@ class ApiController extends AbstractController
             || ($request->hasHeader('API Version') && in_array($request->getHeaderLine('API Version'), self::AVAILABLE_VERSIONS))
         ) {
             $version = ltrim($request->getHeaderLine('API-Version'), 'v');
-        } elseif (in_array($parts[1], [self::SUBJECT_DATA, self::SUBJECT_REGISTER])) {
+        } elseif (in_array($parts[1], self::AVAILABLE_SUBJECTS, true)) {
             $version = $this->getLatestVersion();
         } else {
             throw new Exception('Invalid version');
