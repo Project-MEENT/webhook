@@ -205,7 +205,7 @@ class SolidClient
             throw $e;
         }
 
-        $idTokenClaims = $this->getTokenClaims($tokenSet, $oidcClient);
+        $idTokenClaims = $this->getTokenClaims($oidcClient, $tokenSet);
 
         // Extract webid claim (Solid-OIDC Section 7, Section 8.1).
         $webIdUrl = $idTokenClaims['webid'] ?? $idTokenClaims['sub'] ?? null;
@@ -347,7 +347,6 @@ class SolidClient
         if ($session !== null) {
             $snapshot = [
                 DpopProofFactory::SESSION_KEY => $session->get(DpopProofFactory::SESSION_KEY),
-                'saved_at' => time(),
                 'solid_access_token' => $session->get('solid_access_token'),
                 'solid_refresh_token' => $session->get('solid_refresh_token'),
                 'solid_resource_url' => $session->get('solid_resource_url'),
@@ -409,7 +408,7 @@ class SolidClient
         return $registeredClaims;
     }
 
-    private function getTokenClaims(TokenSetInterface $tokenSet, OidcClientInterface $oidcClient): array
+    private function getTokenClaims(OidcClientInterface $oidcClient, TokenSetInterface $tokenSet): array
     {
         $idToken = $tokenSet->getIdToken(); // Unencrypted id_token, if returned
 
@@ -745,10 +744,10 @@ class SolidClient
 
     private function saveOfflineGrant(IssuerInterface $issuer, $webIdUrl, $grant)
     {
-        $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
-
+        $grant['saved_at'] = time();
         $encodedGrant = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
+        $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
         $this->filesystem->write($offlineGrantFile, $encodedGrant);
     }
 }
