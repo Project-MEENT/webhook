@@ -170,6 +170,24 @@ class SolidClient
         $authorizationCode = $queryParams['code'];
         $state = $queryParams['state'];
 
+        // In callback mode, issuer is recovered exclusively from signed state.
+
+        // CSRF: validate state matches what we sent (OIDC Core Section 3.1.2.7).
+        if ($this->config['useCsrfCheck'] === true) {
+            $expectedState = $this->session->get('oauth_state');
+
+            if ($state !== $expectedState) {
+                $message = vsprintf(
+                    'CSRF Check Failed. Received state "%s" does not match stored state "%s" from session', [
+                    'returned_state' => $state,
+                    'expected_state' => $expectedState,
+                ]);
+
+                throw SolidException::create($message);
+            }
+
+            $this->session->remove('oauth_state');
+        }
 
         // In callback mode, issuer is recovered exclusively from signed state.
         $issuerUrl = $this->getIssuerUrlFromState($state);
@@ -697,21 +715,6 @@ class SolidClient
 
     private function getIssuerUrlFromState($state)
     {
-        // CSRF: validate state matches what we sent (OIDC Core Section 3.1.2.7).
-        if ($this->config['useCsrfCheck'] === true) {
-            $expectedState = $this->session->get('oauth_state');
-            if ($state !== $expectedState) {
-                $message = vsprintf(
-                    'CSRF Check Failed. Received state "%s" does not match stored state "%s" from session', [
-                    'returned_state' => $state,
-                    'expected_state' => $expectedState,
-                ]);
-
-                throw SolidException::create($message);
-            }
-            $this->session->remove('oauth_state');
-        }
-
         $parts = explode('.', $state);
 
         if (count($parts) !== 3) {
