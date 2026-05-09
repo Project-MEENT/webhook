@@ -211,8 +211,8 @@ class SolidClient
         $webIdUrl = $idTokenClaims['webid'] ?? $idTokenClaims['sub'] ?? null;
 
         // -------------------------------------------------------------------------
-        // Persist tokens for offline operation.
-        // Store refresh_token server-side in session; never expose to browser (OIDC Core Section 12).
+        // Persist tokens for offline operation — written directly to the grant file,
+        // Store refresh_token server-side; never expose to browser (OIDC Core Section 12).
         if ($this->config['useOfflineAccess'] === true) {
             $expiresIn = $tokenSet->getExpiresIn();
             // @CHECKME: Not sure which should come first, the expiry form the token or from the id_token
@@ -224,20 +224,16 @@ class SolidClient
                 $tokenExpiry = time() + 3600;
             }
 
-            $this->session->set('solid_access_token', $tokenSet->getAccessToken());
-            $this->session->set('solid_refresh_token', $tokenSet->getRefreshToken());
-            $this->session->set('solid_token_expiry', $tokenExpiry);
-            $this->session->set('solid_webid', $webIdUrl);
-        }
+            $grant = array_filter([
+                'solid_access_token'   => $tokenSet->getAccessToken(),
+                'solid_refresh_token'  => $tokenSet->getRefreshToken(),
+                'solid_token_expiry'   => $tokenExpiry,
+                'solid_webid'          => $webIdUrl,
+            ], static function ($value) {
+                return $value !== null && $value !== '';
+            });
 
-        $accessToken = $tokenSet->getAccessToken(); // Access token, if returned
-
-        if ($this->config['useOfflineAccess'] === true) {
-            $grant = $this->getGrantFromSession();
-
-            if ($grant !== []) {
-                $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
-            }
+            $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
         }
 
         return $issuerUrl;
@@ -336,31 +332,6 @@ class SolidClient
         $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
 
         return $issuerHash . '/issuer_metadata.json';
-    }
-
-    private function getGrantFromSession()
-    {
-        $grant = [];
-
-        $session = $this->session;
-
-        if ($session !== null) {
-            $snapshot = [
-                DpopProofFactory::SESSION_KEY => $session->get(DpopProofFactory::SESSION_KEY),
-                'solid_access_token' => $session->get('solid_access_token'),
-                'solid_refresh_token' => $session->get('solid_refresh_token'),
-                'solid_resource_url' => $session->get('solid_resource_url'),
-                'solid_storage_root' => $session->get('solid_storage_root'),
-                'solid_token_expiry' => $session->get('solid_token_expiry'),
-                'solid_webid' => $session->get('solid_webid'),
-            ];
-
-            $grant = array_filter($snapshot, static function ($value): bool {
-                return $value !== null && $value !== '';
-            });
-        }
-
-        return $grant;
     }
 
     private function getGrantFilePath(IssuerInterface $issuer, $webIdUrl)
@@ -640,86 +611,64 @@ class SolidClient
     {
         $accessToken = null;
 
-        $sessionAccessToken = $this->session->get('solid_access_token');
-        $sessionExpiry = $this->session->get('solid_token_expiry');
-        $hasSessionAccessToken = is_string($sessionAccessToken)
-            && $sessionAccessToken !== ''
-            && is_numeric($sessionExpiry)
-            && (int) $sessionExpiry > time() + 60;
+        $grant = $this->getOfflineGrant($issuer, $webIdUrl);
 
-        $sessionRefreshToken = $this->session->get('solid_refresh_token');
-        $hasRefreshToken = is_string($sessionRefreshToken) && $sessionRefreshToken !== '';
+        $storedAccessToken = $grant['solid_access_token'] ?? null;
+        $storedExpiry = $grant['solid_token_expiry'] ?? null;
+        $hasValidAccessToken = is_string($storedAccessToken)
+            && $storedAccessToken !== ''
+            && is_numeric($storedExpiry)
+            && (int) $storedExpiry > time() + 60;
+
+        $storedRefreshToken = $grant['solid_refresh_token'] ?? null;
+        $hasRefreshToken = is_string($storedRefreshToken) && $storedRefreshToken !== '';
 
         // Offline mode: reuse previously granted consent
 
-        if ($hasSessionAccessToken) {
+        if ($hasValidAccessToken) {
             // Reusing stored access token until it expires
-            $accessToken = $sessionAccessToken;
+            $accessToken = $storedAccessToken;
         } elseif ($hasRefreshToken) {
             // Stored access token has expired (or is missing); refresh with the persisted refresh token.
             try {
-                $accessToken = $this->refreshTokens($oidcClient, $sessionRefreshToken);
-                $grant = $this->getGrantFromSession();
-                if ($grant !== []) {
-                    $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
-                }
+                $tokenSet = $this->authorizationService->refresh($oidcClient, $storedRefreshToken);
                 // Refresh token exchange succeeded; offline consent is being reused.
             } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
-                // @KLUDGE: Stored offline grant could not be refreshed: $e->getMessage(); fall back to interactive login
+                // @KLUDGE: Stored offline grant could not be refreshed (see $e->getMessage()) we can not fall back to interactive login
+                //          Remove the stored grants before error out.
                 $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
                 if ($this->filesystem->fileExists($offlineGrantFile)) {
                     $this->filesystem->delete($offlineGrantFile);
                 }
-
-                foreach ([
-                             DpopProofFactory::SESSION_KEY,
-                             'solid_access_token',
-                             'solid_refresh_token',
-                             'solid_resource_url',
-                             'solid_storage_root',
-                             'solid_token_expiry',
-                             'solid_webid',
-                         ] as $key) {
-                    $this->session->remove($key);
-                }
+                throw $e;
             }
         }
-
-        return $accessToken;
-    }
-
-    private function refreshTokens(OidcClientInterface $oidcClient, $persistedRefreshToken)
-    {
-        $tokenSet = $this->authorizationService->refresh($oidcClient, $persistedRefreshToken);
-
-        $accessToken = $tokenSet->getAccessToken();
-        $expiresIn = $tokenSet->getExpiresIn();
-        if ($expiresIn > 0) {
-            $tokenExpiry = time() + $expiresIn;
-        } else {
-            $tokenExpiry = time() + 3600;
-        }
-
-        $this->session->set('solid_access_token', $accessToken);
-        $this->session->set('solid_refresh_token', $tokenSet->getRefreshToken() ?: $persistedRefreshToken);
-        $this->session->set('solid_token_expiry', $tokenExpiry);
 
         $idToken = $tokenSet->getIdToken();
         if (is_string($idToken) && $idToken !== '') {
             try {
                 $idTokenClaims = $this->getVerifiedClaims($oidcClient, $tokenSet);
             } catch (\Facile\JoseVerifier\Exception\ExceptionInterface $e) {
+                // @KLUDGE: refreshed id_token verification failed: $e->getMessage(); continuing with unverified claims',
                 // @FIXME: Unsafe JWTs should only be enabled for specific servers, not all
                 $idTokenClaims = Utility::decodeUnsafeJwt($idToken);
-                // @KLUDGE: refreshed id_token verification failed: $e->getMessage(); continuing with unverified claims',
             }
 
             $refreshedWebId = $idTokenClaims['webid'] ?? $idTokenClaims['sub'] ?? null;
             if (is_string($refreshedWebId) && $refreshedWebId !== '') {
-                $this->session->set('solid_webid', $refreshedWebId);
+                $grant['solid_webid'] = $refreshedWebId;
             }
         }
+
+        $accessToken = $tokenSet->getAccessToken();
+        $expiresIn = $tokenSet->getExpiresIn();
+
+        $grant['solid_access_token'] = $accessToken;
+        $grant['solid_refresh_token'] = $tokenSet->getRefreshToken() ?: $storedRefreshToken;
+        $grant['solid_token_expiry'] = $expiresIn > 0 ? time() + $expiresIn : time() + 3600;
+
+        $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
 
         return $accessToken;
     }
