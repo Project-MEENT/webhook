@@ -191,6 +191,7 @@ class SolidClient
 
         // In callback mode, issuer is recovered exclusively from signed state.
         $issuerUrl = $this->getIssuerUrlFromState($state);
+        $issuer = $this->createIssuerFromUrl($issuerUrl);
 
         $oidcClient = $this->createOidcClientFromIssuerUrl($issuerUrl);
 
@@ -228,7 +229,7 @@ class SolidClient
         $accessToken = $tokenSet->getAccessToken(); // Access token, if returned
 
         if ($this->config['useOfflineAccess'] === true) {
-            $this->saveOfflineGrant($issuerUrl, $webIdUrl);
+            $this->saveOfflineGrant($issuer, $webIdUrl);
         }
 
         return $issuerUrl;
@@ -435,7 +436,7 @@ class SolidClient
         $this->registration = $registration;
     }
 
-    private function createIssuerFromUrl($issuerUrl)
+    private function createIssuerFromUrl($issuerUrl): IssuerInterface
     {
         $issuerUrl = rtrim($issuerUrl, '/');
 
@@ -450,7 +451,7 @@ class SolidClient
         return $issuer;
     }
 
-    private function createIssuerFromWebIdUrl($webIdUrl)
+    private function createIssuerFromWebIdUrl($webIdUrl): IssuerInterface
     {
         $profile = $this->getWebIdProfile($webIdUrl);
 
@@ -512,7 +513,7 @@ class SolidClient
         if ($this->config['useOfflineAccess'] === true) {
             $offlineGrant = [];
 
-            $offlineGrantFile = $this->getGrantFilePath($issuerUrl, $webIdUrl);
+            $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
             if ($filesystem->fileExists($offlineGrantFile)) {
                 $contents = $filesystem->read($offlineGrantFile);
@@ -577,8 +578,10 @@ class SolidClient
             ->build();
     }
 
-    private function getGrantFilePath($issuerUrl, $webIdUrl)
+    private function getGrantFilePath(IssuerInterface $issuer, $webIdUrl)
     {
+        $issuerConfig = $issuer->getMetadata()->toArray();
+        $issuerUrl = $issuerConfig['issuer'];
         $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
         $webIdHash = $this->hashUrl($webIdUrl, 'sha1');
 
@@ -662,7 +665,7 @@ class SolidClient
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 
-    private function getRedirectAuthorizationUri(OidcClientInterface $oidcClient, $issuer)
+    private function getRedirectAuthorizationUri(OidcClientInterface $oidcClient, IssuerInterface $issuer)
     {
         $issuerConfig = $issuer->getMetadata()->toArray();
         $issuerUrl = $issuerConfig['issuer'];
@@ -833,10 +836,6 @@ class SolidClient
     {
         $accessToken = null;
 
-        $issuerConfig = $issuer->getMetadata()->toArray();
-        $issuerUrl = $issuerConfig['issuer'];
-        $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
-
         $sessionAccessToken = $this->session->get('solid_access_token');
         $sessionExpiry = $this->session->get('solid_token_expiry');
         $hasSessionAccessToken = is_string($sessionAccessToken)
@@ -857,11 +856,11 @@ class SolidClient
             try {
                 $accessToken = $this->refreshTokens($oidcClient, $sessionRefreshToken);
 
-                $this->saveOfflineGrant($issuerUrl, $webIdUrl);
+                $this->saveOfflineGrant($issuer, $webIdUrl);
                 // Refresh token exchange succeeded; offline consent is being reused.
             } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
                 // @KLUDGE: Stored offline grant could not be refreshed: $e->getMessage(); fall back to interactive login
-                $offlineGrantFile = $this->getGrantFilePath($issuerUrl, $webIdUrl);
+                $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
                 if ($this->filesystem->fileExists($offlineGrantFile)) {
                     $this->filesystem->delete($offlineGrantFile);
@@ -919,7 +918,7 @@ class SolidClient
         return $accessToken;
     }
 
-    private function saveOfflineGrant($issuerUrl, $webIdUrl)
+    private function saveOfflineGrant(IssuerInterface $issuer, $webIdUrl)
     {
         $session = $this->session;
 
@@ -938,7 +937,7 @@ class SolidClient
             return $value !== null && $value !== '';
         });
 
-        $offlineGrantFile = $this->getGrantFilePath($issuerUrl, $webIdUrl);
+        $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
         $encode = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
