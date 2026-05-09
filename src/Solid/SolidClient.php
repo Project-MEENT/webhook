@@ -111,7 +111,7 @@ class SolidClient
 
         $issuer = $this->createIssuerFromWebIdUrl($webIdUrl);
 
-        $oidcClient = $this->createOidcClientFromIssuer($issuer, $webIdUrl);
+        $oidcClient = $this->createOidcClientFromIssuer($issuer);
 
         $offlineModeHandled = false;
 
@@ -181,13 +181,29 @@ class SolidClient
         //           (how do we know which issuer we are redirected back from?)
         $issuer = $this->createIssuerFromUrl($issuerUrl);
 
-        $oidcClient = $this->createOidcClientFromIssuerOnly($issuer);
+        $oidcClient = $this->createOidcClientFromIssuer($issuer);
 
         // -------------------------------------------------------------------------
         /*/ RFC9449 - DPoP - Section 5. DPoP Access Token Request /*/
         // The token request must include a DPoP header with a valid proof JWT (see RFC9449 Section 4.2 for proof syntax).
 
-        $tokenSet = $this->getTokenSet($authorizationCode, $oidcClient);
+        if ($this->config['usePkce'] === true) {
+            /*/ rfc7636 - PKCE - Section 4.5.  Client Sends the Authorization Code and the Code Verifier to the Token Endpoint /*/
+            $codeVerifier = $this->session->get('pkce_code_verifier');
+            $hasValidCodeVerifier = is_string($codeVerifier) && $codeVerifier !== '';
+            if (! $hasValidCodeVerifier) {
+                throw SolidException::create('Client has no valid PKCE code_verifier for this authorization response ' . $codeVerifier);
+            }
+
+            $params['code_verifier'] = $codeVerifier; // rfc7636 - PKCE - Section 4.5
+        }
+
+        try {
+            $tokenSet = $this->getTokenSet($oidcClient, $authorizationCode);
+        } catch (\Throwable $e) {
+            $this->session->remove('pkce_code_verifier');
+            throw $e;
+        }
 
         $idTokenClaims = $this->getTokenClaims($tokenSet, $oidcClient);
 
@@ -284,7 +300,18 @@ class SolidClient
         return $this->createIssuerFromUrl($issuerUrl);
     }
 
-    private function createOidcClientFromIssuer(IssuerInterface $issuer, $webIdUrl)
+    private function createOidcClientFromIssuer(IssuerInterface $issuer)
+    {
+        $registeredClaims = $this->getClaims($issuer);
+        $clientMetadata = ClientMetadata::fromArray($registeredClaims);
+
+        return $this->oidcClientBuilder
+            ->setClientMetadata($clientMetadata)
+            ->setIssuer($issuer)
+            ->build();
+    }
+
+    private function getClaims(IssuerInterface $issuer): mixed
     {
         // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
         $registeredClaims = $this->getRegisteredClaims($issuer);
@@ -293,55 +320,13 @@ class SolidClient
             $registeredClaims = $this->registerClaims($issuer);
 
             $clientMetadataFile = $this->getClientMetaDataFilePath($issuer);
-            $fileContents = json_encode($registeredClaims, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $fileContents = json_encode($registeredClaims,
+                JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
             $this->filesystem->write($clientMetadataFile, $fileContents);
         }
 
-        $clientMetadata = ClientMetadata::fromArray($registeredClaims);
-
-        if ($this->config['useOfflineAccess'] === true) {
-            $offlineGrant = $this->getOfflineGrant($issuer, $webIdUrl);
-
-            if ($offlineGrant !== []
-                && ! $this->session->has('solid_refresh_token')
-                && ! $this->session->has('solid_access_token')
-            ) {
-                foreach ([
-                             'solid_access_token',
-                             'solid_refresh_token',
-                             'solid_resource_url',
-                             'solid_storage_root',
-                             'solid_token_expiry',
-                             'solid_webid',
-                         ] as $key) {
-                    if (array_key_exists($key, $offlineGrant)) {
-                        $this->session->set($key, $offlineGrant[$key]);
-                    }
-                }
-
-                $sessionKey = DpopProofFactory::SESSION_KEY;
-                if (isset($offlineGrant[$sessionKey]) && is_array($offlineGrant[$sessionKey])) {
-                    $this->session->set($sessionKey, $offlineGrant[$sessionKey]);
-                }
-            }
-        }
-
-        return $this->oidcClientBuilder
-            ->setClientMetadata($clientMetadata)
-            ->setIssuer($issuer)
-            ->build();
-    }
-
-    private function createOidcClientFromIssuerOnly(IssuerInterface $issuer)
-    {
-        $registeredClaims = $this->getRegisteredClaims($issuer);
-        $clientMetadata = ClientMetadata::fromArray($registeredClaims);
-
-        return $this->oidcClientBuilder
-            ->setClientMetadata($clientMetadata)
-            ->setIssuer($issuer)
-            ->build();
+        return $registeredClaims;
     }
 
     private function getClientMetaDataFilePath(IssuerInterface $issuer)
@@ -587,34 +572,18 @@ class SolidClient
         return rtrim($payload['issr'], '/');
     }
 
-    private function getTokenSet(
-        string $authorizationCode,
-        OidcClientInterface $oidcClient
-    ): TokenSetInterface {
+    private function getTokenSet(OidcClientInterface $oidcClient, $authorizationCode): TokenSetInterface
+    {
         $params = [
             'code' => $authorizationCode,
             'grant_type' => 'authorization_code',
             'redirect_uri' => $this->config['client']['RedirectUri'],
         ];
 
-        if ($this->config['usePkce'] === true) {
-            /*/ rfc7636 - PKCE - Section 4.5.  Client Sends the Authorization Code and the Code Verifier to the Token Endpoint /*/
-            $codeVerifier = $this->session->get('pkce_code_verifier');
-            $hasValidCodeVerifier = is_string($codeVerifier) && $codeVerifier !== '';
-            if (! $hasValidCodeVerifier) {
-                throw SolidException::create('Client has no valid PKCE code_verifier for this authorization response ' . $codeVerifier);
-            }
-
-            $params['code_verifier'] = $codeVerifier; // rfc7636 - PKCE - Section 4.5
-        }
-
         try {
             // Use explicit grant() so this example fully controls what gets sent to the token endpoint.
             $tokenSet = $this->authorizationService->grant($oidcClient, $params);
-
-            $this->session->remove('pkce_code_verifier');
         } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
-            $this->session->remove('pkce_code_verifier');
             // InvalidArgumentException(Invalid metadata content)
             if ($e->getPrevious()) {
                 // Response could not be parsed as JSON
