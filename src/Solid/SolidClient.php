@@ -476,16 +476,9 @@ class SolidClient
     private function createOidcClientFromIssuer(IssuerInterface $issuer, $webIdUrl)
     {
         // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
+        $registeredClaims = $this->getRegisteredClaims($issuer);
 
-        $clientMetadataFile = $this->getClientMetaDataFile($issuer);
-
-        $clientMetadataFileExists = $this->filesystem->fileExists($clientMetadataFile);
-
-        if ($clientMetadataFileExists) {
-            // Client already registered, reading metadata from file
-            $fileContents = $this->filesystem->read($clientMetadataFile);
-            $registeredClaims = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
-        } else {
+        if ($registeredClaims === []) {
             // Client not registered, registering oidcClient...
 
             $clientConfig = $this->getClientConfig();
@@ -499,8 +492,9 @@ class SolidClient
                 throw SolidException::create('Dynamic registration failed', $e);
             }
 
-            $fileContents = json_encode($registeredClaims,
-                JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $clientMetadataFile = $this->getClientMetaDataFile($issuer);
+            $fileContents = json_encode($registeredClaims, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
             $this->filesystem->write($clientMetadataFile, $fileContents);
         }
 
@@ -552,10 +546,7 @@ class SolidClient
 
     private function createOidcClientFromIssuerOnly(IssuerInterface $issuer)
     {
-        $clientMetadataFile = $this->getClientMetaDataFile($issuer);
-
-        $fileContents = $this->filesystem->read($clientMetadataFile);
-        $registeredClaims = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
+        $registeredClaims = $this->getRegisteredClaims($issuer);
         $clientMetadata = ClientMetadata::fromArray($registeredClaims);
 
         return $this->oidcClientBuilder
@@ -581,6 +572,23 @@ class SolidClient
         $webIdHash = $this->hashUrl($webIdUrl, 'sha1');
 
         return $issuerHash . '/' . $webIdHash . '.json';
+    }
+
+    private function getRegisteredClaims(IssuerInterface $issuer)
+    {
+        $registeredClaims = [];
+
+        $clientMetadataFile = $this->getClientMetaDataFile($issuer);
+
+        $clientMetadataFileExists = $this->filesystem->fileExists($clientMetadataFile);
+
+        if ($clientMetadataFileExists) {
+            // Client already registered, reading metadata from file
+            $fileContents = $this->filesystem->read($clientMetadataFile);
+            $registeredClaims = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
+        }
+
+        return $registeredClaims;
     }
 
     private function getTokenClaims(TokenSetInterface $tokenSet, OidcClientInterface $oidcClient): array
