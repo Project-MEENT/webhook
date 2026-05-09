@@ -91,13 +91,9 @@ class SolidClient
             }, $resources);
             $storageUrls = array_unique($uris);
 
-            $storageUrls = array_map(static function ($storageUrl) {
-                if (filter_var($storageUrl, FILTER_VALIDATE_URL)) {
-                    echo "Found storage URL in WebID Profile: $storageUrl\n";
-                } else {
-                    echo "Invalid storage URL in WebID Profile: $storageUrl\n";
-                }
-            }, $storageUrls);
+            $storageUrls = array_filter($storageUrls, static function ($storageUrl) {
+                return filter_var($storageUrl, FILTER_VALIDATE_URL);
+            });
         }
 
         return $storageUrls;
