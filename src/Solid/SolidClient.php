@@ -210,6 +210,12 @@ class SolidClient
         // Extract webid claim (Solid-OIDC Section 7, Section 8.1).
         $webIdUrl = $idTokenClaims['webid'] ?? $idTokenClaims['sub'] ?? null;
 
+        if (! is_string($webIdUrl) || ! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
+            throw SolidException::create('Provider did not return a valid WebID URL claim in id_token');
+        }
+
+        // @CHECKME: Do we need to check the provided WebID against (what?)
+
         // -------------------------------------------------------------------------
         // Persist tokens for offline operation — written directly to the grant file,
         // Store refresh_token server-side; never expose to browser (OIDC Core Section 12).
@@ -290,10 +296,24 @@ class SolidClient
             $issuers = array_unique($uris);
         }
 
+        $issuers = array_values(array_filter($issuers, static function ($issuerUrl) {
+            return is_string($issuerUrl) && filter_var($issuerUrl, FILTER_VALIDATE_URL);
+        }));
+
+        if ($issuers === []) {
+            throw SolidException::create(
+                "Could not resolve an OIDC issuer from '$webIdUrl'. Please provide a Solid WebID URL that advertises solid:oidcIssuer."
+            );
+        }
+
         // @FIXME: If there is more than one issuer, the user should be able to choose which on to use
         $issuerUrl = reset($issuers);
 
-        return $this->createIssuerFromUrl($issuerUrl);
+        if (is_string($issuerUrl) && filter_var($issuerUrl, FILTER_VALIDATE_URL)) {
+            return $this->createIssuerFromUrl($issuerUrl);
+        } else {
+            throw SolidException::create("Resolved issuer URL '$issuerUrl' is not a valid URL");
+        }
     }
 
     private function createOidcClientFromIssuer(IssuerInterface $issuer)
@@ -539,16 +559,26 @@ class SolidClient
             throw SolidException::create($message);
         }
 
-        return rtrim($payload['issr'], '/');
+        $issuerUrl = rtrim($payload['issr'], '/');
+
+        if (filter_var($issuerUrl, FILTER_VALIDATE_URL)) {
+            return $issuerUrl;
+        } else {
+            throw SolidException::create("Resolved issuer '$issuerUrl' is not a valid URL");
+        }
     }
 
-    private function getTokenSet(OidcClientInterface $oidcClient, $authorizationCode): TokenSetInterface
+    private function getTokenSet(OidcClientInterface $oidcClient, $authorizationCode, ?string $codeVerifier = null): TokenSetInterface
     {
         $params = [
             'code' => $authorizationCode,
             'grant_type' => 'authorization_code',
             'redirect_uri' => $this->config['client']['RedirectUri'],
         ];
+
+        if ($this->config['usePkce'] === true && is_string($codeVerifier) && $codeVerifier !== '') {
+            $params['code_verifier'] = $codeVerifier;
+        }
 
         try {
             // Use explicit grant() so this example fully controls what gets sent to the token endpoint.
@@ -643,32 +673,32 @@ class SolidClient
                 }
                 throw $e;
             }
-        }
 
-        $idToken = $tokenSet->getIdToken();
-        if (is_string($idToken) && $idToken !== '') {
-            try {
-                $idTokenClaims = $this->getVerifiedClaims($oidcClient, $tokenSet);
-            } catch (\Facile\JoseVerifier\Exception\ExceptionInterface $e) {
-                // @KLUDGE: refreshed id_token verification failed: $e->getMessage(); continuing with unverified claims',
-                // @FIXME: Unsafe JWTs should only be enabled for specific servers, not all
-                $idTokenClaims = Utility::decodeUnsafeJwt($idToken);
+            $idToken = $tokenSet->getIdToken();
+            if (is_string($idToken) && $idToken !== '') {
+                try {
+                    $idTokenClaims = $this->getVerifiedClaims($oidcClient, $tokenSet);
+                } catch (\Facile\JoseVerifier\Exception\ExceptionInterface $e) {
+                    // @KLUDGE: refreshed id_token verification failed: $e->getMessage(); continuing with unverified claims',
+                    // @FIXME: Unsafe JWTs should only be enabled for specific servers, not all
+                    $idTokenClaims = Utility::decodeUnsafeJwt($idToken);
+                }
+
+                $refreshedWebId = $idTokenClaims['webid'] ?? $idTokenClaims['sub'] ?? null;
+                if (is_string($refreshedWebId) && $refreshedWebId !== '') {
+                    $grant['solid_webid'] = $refreshedWebId;
+                }
             }
 
-            $refreshedWebId = $idTokenClaims['webid'] ?? $idTokenClaims['sub'] ?? null;
-            if (is_string($refreshedWebId) && $refreshedWebId !== '') {
-                $grant['solid_webid'] = $refreshedWebId;
-            }
+            $accessToken = $tokenSet->getAccessToken();
+            $expiresIn = $tokenSet->getExpiresIn();
+
+            $grant['solid_access_token'] = $accessToken;
+            $grant['solid_refresh_token'] = $tokenSet->getRefreshToken() ?: $storedRefreshToken;
+            $grant['solid_token_expiry'] = $expiresIn > 0 ? time() + $expiresIn : time() + 3600;
+
+            $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
         }
-
-        $accessToken = $tokenSet->getAccessToken();
-        $expiresIn = $tokenSet->getExpiresIn();
-
-        $grant['solid_access_token'] = $accessToken;
-        $grant['solid_refresh_token'] = $tokenSet->getRefreshToken() ?: $storedRefreshToken;
-        $grant['solid_token_expiry'] = $expiresIn > 0 ? time() + $expiresIn : time() + 3600;
-
-        $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
 
         return $accessToken;
     }
@@ -693,6 +723,10 @@ class SolidClient
 
     private function saveOfflineGrant(IssuerInterface $issuer, $webIdUrl, $grant)
     {
+        if (! is_string($webIdUrl) || ! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
+            throw SolidException::create("Cannot persist offline grant: invalid WebID '$webIdUrl'");
+        }
+
         $grant['saved_at'] = time();
         $encodedGrant = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
