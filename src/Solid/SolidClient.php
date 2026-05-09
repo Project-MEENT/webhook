@@ -116,26 +116,39 @@ class SolidClient
 
     // @FIXME: There is a scenario where, if the page is opened with a WebID, and there has not yet been a consent call, we will get a 403!
 
-    final public function handleWebIdRequest($webIdUrl)
+    final public function connectWebId($webIdUrl)
     {
-        if (filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
-            $issuer = $this->createIssuerFromWebIdUrl($webIdUrl);
-        } else {
+        $redirectAuthorizationUri = '';
+
+        if (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
             throw SolidException::create("Provided WebID '$webIdUrl' is not a valid URL");
         }
 
-        return $this->handleRequest($issuer);
-    }
+        $issuer = $this->createIssuerFromWebIdUrl($webIdUrl);
 
-    final public function handleIssuerRequest($issuerUrl)
-    {
-        if (filter_var($issuerUrl, FILTER_VALIDATE_URL)) {
-            $issuer = $this->createIssuerFromUrl($issuerUrl);
-        } else {
-            throw SolidException::create("Provided Issuer '$issuerUrl' is not a valid URL");
+        $oidcClient = $this->createOidcClientFromIssuer($issuer);
+
+        $offlineModeHandled = false;
+
+        if ($this->config['useOfflineAccess'] === true) {
+            $accessToken = $this->handleOfflineAccess($oidcClient, $issuer);
+
+            $issuerConfig = $issuer->getMetadata()->toArray();
+            $issuerUrl = $issuerConfig['issuer'];
+            $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
+
+            if (is_string($accessToken) && $accessToken !== '') {
+                $this->saveOfflineGrant($issuerHash);
+
+                $offlineModeHandled = true;
+            }
         }
 
-        return $this->handleRequest($issuer);
+        if ($offlineModeHandled === false) {
+            $redirectAuthorizationUri = $this->getRedirectAuthorizationUri($oidcClient, $issuer);
+        }
+
+        return $redirectAuthorizationUri;
     }
 
     final public function storeResource($resourceUrl, $resource)
@@ -480,35 +493,6 @@ class SolidClient
             ->setClientMetadata($clientMetadata)
             ->setIssuer($issuer)
             ->build();
-    }
-
-    private function handleRequest(IssuerInterface $issuer): string
-    {
-        $redirectAuthorizationUri = '';
-
-        $oidcClient = $this->createOidcClientFromIssuer($issuer);
-
-        $offlineModeHandled = false;
-
-        if ($this->config['useOfflineAccess'] === true) {
-            $accessToken = $this->handleOfflineAccess($oidcClient, $issuer);
-
-            $issuerConfig = $issuer->getMetadata()->toArray();
-            $issuerUrl = $issuerConfig['issuer'];
-            $issuerHash = hash('sha256', $issuerUrl);
-
-            if (is_string($accessToken) && $accessToken !== '') {
-                $this->saveOfflineGrant($issuerHash);
-
-                $offlineModeHandled = true;
-            }
-        }
-
-        if ($offlineModeHandled === false) {
-            $redirectAuthorizationUri = $this->getRedirectAuthorizationUri($oidcClient, $issuer);
-        }
-
-        return $redirectAuthorizationUri;
     }
 
     private function getTokenClaims(TokenSetInterface $tokenSet, OidcClientInterface $oidcClient): array

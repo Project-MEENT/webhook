@@ -201,7 +201,6 @@ class ApiController extends AbstractController
                 // Detect whether this request is the callback from the authorization server.
                 // When the OP redirects back it always includes `code` (success) or `error` (failure).
                 $isRedirect = isset($queryParams['code']) || isset($queryParams['error']);
-                $providedIssuerUrl = $request->getParsedBody()['issuer'] ?? $queryParams['issuer'] ?? '';
                 $webIdUrl = $request->getParsedBody()['webid'] ?? $queryParams['webid'] ?? '';
 
                 $solidClient = new SolidClient($request);
@@ -209,11 +208,8 @@ class ApiController extends AbstractController
                 if ($isRedirect) {
                     $issuerUrl = $solidClient->handleRedirect($queryParams);
                     // @TODO: Redirect to self with ?webid=$webId to remove token query-params
-                } elseif ($providedIssuerUrl !== '') {
-                    // @TODO: The UI currently only supports providing a WebID, but there is logic to support providing an Issuer URL
-                    $redirectAuthorizationUri = $solidClient->handleIssuerRequest($providedIssuerUrl);
                 } elseif ($webIdUrl !== '') {
-                    $redirectAuthorizationUri = $solidClient->handleWebIdRequest($webIdUrl);
+                    $redirectAuthorizationUri = $solidClient->connectWebId($webIdUrl);
                 } else {
                     $showForm = true;
                 }
