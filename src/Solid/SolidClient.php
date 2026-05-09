@@ -157,18 +157,18 @@ class SolidClient
             throw SolidException::create('Provider returned an error ' . $queryParams['error']);
         }
 
-        $authorizationCode = $queryParams['code'] ?? '';
-        $state = $queryParams['state'] ?? '';
-
         /*/  rfc7636 - PKCE - Section 4.4.  Server Returns the Code /*/
         // The authorization response must include a non-empty authorization code.
-        if ($authorizationCode === '') {
-            throw SolidException::create('Provider did not return a (valid) authorization code ' . $authorizationCode);
+        if (! isset($queryParams['code'])) {
+            throw SolidException::create('Provider did not return an authorization code');
         }
 
-        if ($state === '') {
-            throw SolidException::create('Callback is missing "state" parameter ');
+        if (! isset($queryParams['state'])) {
+            throw SolidException::create('Provider did not return a "state" parameter ');
         }
+
+        $authorizationCode = $queryParams['code'];
+        $state = $queryParams['state'];
 
 
         // In callback mode, issuer is recovered exclusively from signed state.
