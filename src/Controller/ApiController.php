@@ -207,67 +207,69 @@ class ApiController extends AbstractController
             case 'POST':
                 // @FIXME: Try/Catch + Error handling
 
-                $isRedirect = isset($request->getQueryParams()['code']) || isset($request->getQueryParams()['error']);
+                $showForm = false;
 
-                if ($isRedirect || $requestMethod === 'POST' || isset($request->getQueryParams()['webid'])) {
-                    $solidClient = new SolidClient();
-                    $responseObject = new Response();
+                // Detect whether this request is the callback from the authorization server.
+                // When the OP redirects back it always includes `code` (success) or `error` (failure).
+                $isRedirect = isset($queryParams['code']) || isset($queryParams['error']);
+                $providedIssuerUrl = $request->getParsedBody()['issuer'] ?? $queryParams['issuer'] ?? '';
+                $webIdUrl = $request->getParsedBody()['webid'] ?? $queryParams['webid'] ?? '';
 
-                    $responseObject = $solidClient->handleRequest($request, $responseObject);
-                    $responseObject->getBody()->rewind();
-                    $contents = $responseObject->getBody()->getContents();
+                $solidClient = new SolidClient($request);
 
-                    if ($contents !== '') {
-                        $template = $this->getContents('template');
-                        $response['content'] = vsprintf($template, [
-                            'footer' => '',
-                            'header' => '<p>Your P1 dongle can now be connected to your Solid Pod</p>',
-                            'main' => "<section>$contents</section>",
-                            'script' => '',
-                            'style' => <<<CSS
-                                            title { display: inline; }
-                                            h2 { width: 100%; }
-                    CSS
-                            ,
-                            'title' => 'Provide consent',
-                        ]);
-                    }
-
-                    $response['headers'] = array_merge($response['headers'], $responseObject->getHeaders());
-                    $response['status'] = $responseObject->getStatusCode();
+                if ($isRedirect) {
+                    $issuerUrl = $solidClient->handleRedirect($queryParams);
+                    // @TODO: Redirect to self with ?webid=$webId to remove token query-params
+                } elseif ($providedIssuerUrl !== '') {
+                    // @TODO: The UI currently only supports providing a WebID, but there is logic to support providing an Issuer URL
+                    $redirectAuthorizationUri = $solidClient->handleIssuerRequest($providedIssuerUrl);
+                } elseif ($webIdUrl !== '') {
+                    $redirectAuthorizationUri = $solidClient->handleWebIdRequest($webIdUrl);
                 } else {
-                    // Show Form
+                    $showForm = true;
+                }
+
+                // Create Response
+                if (! empty($redirectAuthorizationUri)) {
+                    $response['status'] = 302;
+                    $response['headers']['Location'] = [$redirectAuthorizationUri];
+                } else {
                     $template = $this->getContents('template');
 
-                    $response['content'] = vsprintf($template, [
+                    $content = [
                         'footer' => '',
                         'header' => '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
-                        'main' => <<<'HTML'
-                        <section>
-                            <form enctype="application/x-www-form-urlencoded" method="POST">
-                            <fieldset><legend>WebID URL</legend>
-                                <label>Please provide the URL of your Solid WebID:
-                                    <input
-                                        name="webid"
-                                        placeholder="https://idp.example.com/"
-                                        required
-                                        type="url"
-                                        value=""
-                                    />
-                                </label>
-                            </fieldset>
-                                <button>Connect</button>
-                            </form>
-                        </section>
-HTML,
+                        'main' => '<section></section>',
                         'script' => '',
-                        'style' => <<<CSS
-                        title { display: inline; }
-                        h2 { width: 100%; }
-CSS
-                        ,
+                        'style' => "h2 { width: 100%; }\ntitle { display: inline; }",
                         'title' => 'Provide consent',
-                    ]);
+                    ];
+
+                    if ($showForm) {
+                        $content['main'] = <<<'HTML'
+                <section>
+                    <form enctype="application/x-www-form-urlencoded" method="POST">
+                    <fieldset><legend>WebID URL</legend>
+                        <label>Please provide the URL of your Solid WebID:
+                            <input
+                                name="webid"
+                                placeholder="https://idp.example.com/"
+                                required
+                                type="url"
+                                value=""
+                            />
+                        </label>
+                    </fieldset>
+                        <button>Connect</button>
+                    </form>
+                </section>
+HTML;
+                    } else {
+                        $content['header'] = '<p>Your P1 dongle can now be connected to your Solid Pod</p>';
+                        $content['title'] = 'Consent Provided';
+                    }
+
+                    $response['content'] = vsprintf($template, $content);
                 }
             break;
 
