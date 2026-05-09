@@ -187,6 +187,7 @@ class SolidClient
         /*/ RFC9449 - DPoP - Section 5. DPoP Access Token Request /*/
         // The token request must include a DPoP header with a valid proof JWT (see RFC9449 Section 4.2 for proof syntax).
 
+        $codeVerifier = null;
         if ($this->config['usePkce'] === true) {
             /*/ rfc7636 - PKCE - Section 4.5.  Client Sends the Authorization Code and the Code Verifier to the Token Endpoint /*/
             $codeVerifier = $this->session->get('pkce_code_verifier');
@@ -194,12 +195,11 @@ class SolidClient
             if (! $hasValidCodeVerifier) {
                 throw SolidException::create('Client has no valid PKCE code_verifier for this authorization response ' . $codeVerifier);
             }
-
-            $params['code_verifier'] = $codeVerifier; // rfc7636 - PKCE - Section 4.5
         }
 
         try {
-            $tokenSet = $this->getTokenSet($oidcClient, $authorizationCode);
+            $tokenSet = $this->getTokenSet($oidcClient, $authorizationCode, $codeVerifier);
+            $this->session->remove('pkce_code_verifier');
         } catch (\Throwable $e) {
             $this->session->remove('pkce_code_verifier');
             throw $e;
