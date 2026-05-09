@@ -11,7 +11,6 @@ class DpopAuthMethod implements AuthMethodInterface
     final public function __construct(
         private AuthMethodInterface $authMethod,
         private DpopProofFactory $dpopProofFactory,
-        private Session $sessionStore
     ) {}
 
     final public function getSupportedMethod(): string
@@ -31,7 +30,6 @@ class DpopAuthMethod implements AuthMethodInterface
         $request = $this->authMethod->createRequest($request, $client, $claims);
 
         $dpopProof = $this->dpopProofFactory->createProofForRequest($request);
-        $this->sessionStore->set('last_dpop_proof', $dpopProof);
 
         return $request->withHeader('DPoP', $dpopProof);
     }
