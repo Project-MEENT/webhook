@@ -145,6 +145,77 @@ class SolidClient
         return $redirectAuthorizationUri;
     }
 
+    final public function handleRedirect($queryParams): string
+    {
+        // Step 3. Exchange code for access token
+
+        // At this point the user is redirected back to the application from the authorization server.
+        // The authorization server will redirect the user back to the application with a code or error parameter.
+
+        if (isset($queryParams['error'])) {
+            // The error parameter is set when something has gone wrong on the OP side.
+            throw SolidException::create('Provider returned an error ' . $queryParams['error']);
+        }
+
+        $authorizationCode = $queryParams['code'] ?? '';
+        $state = $queryParams['state'] ?? '';
+
+        /*/  rfc7636 - PKCE - Section 4.4.  Server Returns the Code /*/
+        // The authorization response must include a non-empty authorization code.
+        if ($authorizationCode === '') {
+            throw SolidException::create('Provider did not return a (valid) authorization code ' . $authorizationCode);
+        }
+
+        if ($state === '') {
+            throw SolidException::create('Callback is missing "state" parameter ');
+        }
+
+
+        // In callback mode, issuer is recovered exclusively from signed state.
+        $issuerUrl = $this->getIssuerUrlFromState($state);
+
+        $oidcClient = $this->createOidcClientFromIssuerUrl($issuerUrl);
+
+        // -------------------------------------------------------------------------
+        /*/ RFC9449 - DPoP - Section 5. DPoP Access Token Request /*/
+        // The token request must include a DPoP header with a valid proof JWT (see RFC9449 Section 4.2 for proof syntax).
+
+        $tokenSet = $this->getTokenSet($authorizationCode, $oidcClient);
+
+        $idTokenClaims = $this->getTokenClaims($tokenSet, $oidcClient);
+
+        // Extract webid claim (Solid-OIDC Section 7, Section 8.1).
+        $webIdUrl = $idTokenClaims['webid'] ?? $idTokenClaims['sub'] ?? null;
+
+        // -------------------------------------------------------------------------
+        // Persist tokens for offline operation.
+        // Store refresh_token server-side in session; never expose to browser (OIDC Core Section 12).
+        if ($this->config['useOfflineAccess'] === true) {
+            $expiresIn = $tokenSet->getExpiresIn();
+            // @CHECKME: Not sure which should come first, the expiry form the token or from the id_token
+            if ($expiresIn > 0) {
+                $tokenExpiry = time() + $expiresIn;
+            } elseif (isset($idTokenClaims['exp']) && is_numeric($idTokenClaims['exp'])) {
+                $tokenExpiry = (int) $idTokenClaims['exp'];
+            } else {
+                $tokenExpiry = time() + 3600;
+            }
+
+            $this->session->set('solid_access_token', $tokenSet->getAccessToken());
+            $this->session->set('solid_refresh_token', $tokenSet->getRefreshToken());
+            $this->session->set('solid_token_expiry', $tokenExpiry);
+            $this->session->set('solid_webid', $webIdUrl);
+        }
+
+        $accessToken = $tokenSet->getAccessToken(); // Access token, if returned
+
+        if ($this->config['useOfflineAccess'] === true) {
+            $this->saveOfflineGrant($issuerUrl, $webIdUrl);
+        }
+
+        return $issuerUrl;
+    }
+
     final public function storeResource($resourceUrl, $resource)
     {
         $accessToken = $this->getAccessToken();
@@ -516,77 +587,6 @@ class SolidClient
         }
 
         return $idTokenClaims;
-    }
-
-    final public function handleRedirect($queryParams): string
-    {
-        // Step 3. Exchange code for access token
-
-        // At this point the user is redirected back to the application from the authorization server.
-        // The authorization server will redirect the user back to the application with a code or error parameter.
-
-        if (isset($queryParams['error'])) {
-            // The error parameter is set when something has gone wrong on the OP side.
-            throw SolidException::create('Provider returned an error ' . $queryParams['error']);
-        }
-
-        $authorizationCode = $queryParams['code'] ?? '';
-        $state = $queryParams['state'] ?? '';
-
-        /*/  rfc7636 - PKCE - Section 4.4.  Server Returns the Code /*/
-        // The authorization response must include a non-empty authorization code.
-        if ($authorizationCode === '') {
-            throw SolidException::create('Provider did not return a (valid) authorization code ' . $authorizationCode);
-        }
-
-        if ($state === '') {
-            throw SolidException::create('Callback is missing "state" parameter ');
-        }
-
-
-        // In callback mode, issuer is recovered exclusively from signed state.
-        $issuerUrl = $this->getIssuerUrlFromState($state);
-
-        $oidcClient = $this->createOidcClientFromIssuerUrl($issuerUrl);
-
-        // -------------------------------------------------------------------------
-        /*/ RFC9449 - DPoP - Section 5. DPoP Access Token Request /*/
-        // The token request must include a DPoP header with a valid proof JWT (see RFC9449 Section 4.2 for proof syntax).
-
-        $tokenSet = $this->getTokenSet($authorizationCode, $oidcClient);
-
-        $idTokenClaims = $this->getTokenClaims($tokenSet, $oidcClient);
-
-        // Extract webid claim (Solid-OIDC Section 7, Section 8.1).
-        $webIdUrl = $idTokenClaims['webid'] ?? $idTokenClaims['sub'] ?? null;
-
-        // -------------------------------------------------------------------------
-        // Persist tokens for offline operation.
-        // Store refresh_token server-side in session; never expose to browser (OIDC Core Section 12).
-        if ($this->config['useOfflineAccess'] === true) {
-            $expiresIn = $tokenSet->getExpiresIn();
-            // @CHECKME: Not sure which should come first, the expiry form the token or from the id_token
-            if ($expiresIn > 0) {
-                $tokenExpiry = time() + $expiresIn;
-            } elseif (isset($idTokenClaims['exp']) && is_numeric($idTokenClaims['exp'])) {
-                $tokenExpiry = (int) $idTokenClaims['exp'];
-            } else {
-                $tokenExpiry = time() + 3600;
-            }
-
-            $this->session->set('solid_access_token', $tokenSet->getAccessToken());
-            $this->session->set('solid_refresh_token', $tokenSet->getRefreshToken());
-            $this->session->set('solid_token_expiry', $tokenExpiry);
-            $this->session->set('solid_webid', $webIdUrl);
-        }
-
-        $accessToken = $tokenSet->getAccessToken(); // Access token, if returned
-
-        if ($this->config['useOfflineAccess'] === true) {
-            $this->saveOfflineGrant($issuerUrl, $webIdUrl);
-        }
-
-        return $issuerUrl;
     }
 
     private function getVerifiedClaims(OidcClientInterface $oidcClient, TokenSetInterface $tokenSet)
