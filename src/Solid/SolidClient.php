@@ -133,12 +133,7 @@ class SolidClient
         if ($this->config['useOfflineAccess'] === true) {
             $accessToken = $this->handleOfflineAccess($oidcClient, $issuer, $webIdUrl);
 
-            $issuerConfig = $issuer->getMetadata()->toArray();
-            $issuerUrl = $issuerConfig['issuer'];
-
             if (is_string($accessToken) && $accessToken !== '') {
-                $this->saveOfflineGrant($issuerUrl, $webIdUrl);
-
                 $offlineModeHandled = true;
             }
         }
