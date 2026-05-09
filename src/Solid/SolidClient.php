@@ -191,9 +191,12 @@ class SolidClient
 
         // In callback mode, issuer is recovered exclusively from signed state.
         $issuerUrl = $this->getIssuerUrlFromState($state);
+        // At this point, post redirect, the oidcClient SHOULD already be registered
+        // @CHECKME: Shouldn't we "somehow" check the issuer in the state against the issuer we came from?
+        //           (how do we know which issuer we are redirected back from?)
         $issuer = $this->createIssuerFromUrl($issuerUrl);
 
-        $oidcClient = $this->createOidcClientFromIssuerUrl($issuerUrl);
+        $oidcClient = $this->createOidcClientFromIssuerOnly($issuer);
 
         // -------------------------------------------------------------------------
         /*/ RFC9449 - DPoP - Section 5. DPoP Access Token Request /*/
@@ -472,31 +475,24 @@ class SolidClient
 
     private function createOidcClientFromIssuer(IssuerInterface $issuer, $webIdUrl)
     {
-        $filesystem = $this->filesystem;
-
-        $issuerConfig = $issuer->getMetadata()->toArray();
-        $issuerUrl = $issuerConfig['issuer'];
-
-        // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
-        $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
-
-        // If the issuer requires pre-registration, use the initial access token provided during that process to register the oidcClient.
-        $initialTokens = [$issuerHash => null];
-
         // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
-        $clientMetadataFile = $issuerHash . '/issuer_metadata.json';
 
-        $clientMetadataFileExists = $filesystem->fileExists($clientMetadataFile);
+        $clientMetadataFile = $this->getClientMetaDataFile($issuer);
+
+        $clientMetadataFileExists = $this->filesystem->fileExists($clientMetadataFile);
 
         if ($clientMetadataFileExists) {
             // Client already registered, reading metadata from file
-            $fileContents = $filesystem->read($clientMetadataFile);
+            $fileContents = $this->filesystem->read($clientMetadataFile);
             $registeredClaims = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
         } else {
             // Client not registered, registering oidcClient...
+
             $clientConfig = $this->getClientConfig();
             try {
-                $registeredClaims = $this->registration->register($issuer, $clientConfig, $initialTokens[$issuerHash]);
+                // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
+                // If the issuer requires pre-registration, use the initial access token provided during that process to register the oidcClient.
+                $registeredClaims = $this->registration->register($issuer, $clientConfig);
             } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
                 // InvalidArgumentException(Issuer does not support dynamic oidcClient registration)
                 // RuntimeException(Unable to encode oidcClient metadata | Unable to register OpenID oidcClient | Registration response did not return a client_id field)
@@ -505,7 +501,7 @@ class SolidClient
 
             $fileContents = json_encode($registeredClaims,
                 JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-            $filesystem->write($clientMetadataFile, $fileContents);
+            $this->filesystem->write($clientMetadataFile, $fileContents);
         }
 
         $clientMetadata = ClientMetadata::fromArray($registeredClaims);
@@ -515,8 +511,8 @@ class SolidClient
 
             $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
-            if ($filesystem->fileExists($offlineGrantFile)) {
-                $contents = $filesystem->read($offlineGrantFile);
+            if ($this->filesystem->fileExists($offlineGrantFile)) {
+                $contents = $this->filesystem->read($offlineGrantFile);
                 $storedGrant = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
 
                 if (is_array($storedGrant)) {
@@ -554,28 +550,27 @@ class SolidClient
             ->build();
     }
 
-    private function createOidcClientFromIssuerUrl($issuerUrl)
+    private function createOidcClientFromIssuerOnly(IssuerInterface $issuer)
     {
-        $openidDiscoveryUrl = $issuerUrl . '/.well-known/openid-configuration';
-        // At this point, post redirect, the oidcClient SHOULD already be registered
-        // @CHECKME: Shouldn't we "somehow" check the issuer in the state against the issuer we came from?
-        //           (how do we know which issuer we are redirected back from?)
-        $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
-        $clientMetadataFile = $issuerHash . '/issuer_metadata.json';
+        $clientMetadataFile = $this->getClientMetaDataFile($issuer);
+
         $fileContents = $this->filesystem->read($clientMetadataFile);
         $registeredClaims = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
         $clientMetadata = ClientMetadata::fromArray($registeredClaims);
-
-        try {
-            $issuer = $this->issuerBuilder->build($openidDiscoveryUrl);
-        } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
-            throw SolidException::create('Failed to discover issuer metadata', $e);
-        }
 
         return $this->oidcClientBuilder
             ->setClientMetadata($clientMetadata)
             ->setIssuer($issuer)
             ->build();
+    }
+
+    private function getClientMetaDataFile(IssuerInterface $issuer)
+    {
+        $issuerConfig = $issuer->getMetadata()->toArray();
+        $issuerUrl = $issuerConfig['issuer'];
+        $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
+
+        return $issuerHash . '/issuer_metadata.json';
     }
 
     private function getGrantFilePath(IssuerInterface $issuer, $webIdUrl)
