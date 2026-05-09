@@ -126,19 +126,18 @@ class SolidClient
 
         $issuer = $this->createIssuerFromWebIdUrl($webIdUrl);
 
-        $oidcClient = $this->createOidcClientFromIssuer($issuer);
+        $oidcClient = $this->createOidcClientFromIssuer($issuer, $webIdUrl);
 
         $offlineModeHandled = false;
 
         if ($this->config['useOfflineAccess'] === true) {
-            $accessToken = $this->handleOfflineAccess($oidcClient, $issuer);
+            $accessToken = $this->handleOfflineAccess($oidcClient, $issuer, $webIdUrl);
 
             $issuerConfig = $issuer->getMetadata()->toArray();
             $issuerUrl = $issuerConfig['issuer'];
-            $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
 
             if (is_string($accessToken) && $accessToken !== '') {
-                $this->saveOfflineGrant($issuerHash);
+                $this->saveOfflineGrant($issuerUrl, $webIdUrl);
 
                 $offlineModeHandled = true;
             }
@@ -386,7 +385,7 @@ class SolidClient
         return $this->createIssuerFromUrl($issuerUrl);
     }
 
-    private function createOidcClientFromIssuer(IssuerInterface $issuer)
+    private function createOidcClientFromIssuer(IssuerInterface $issuer, $webIdUrl)
     {
         $filesystem = $this->filesystem;
 
@@ -429,11 +428,10 @@ class SolidClient
         if ($this->config['useOfflineAccess'] === true) {
             $offlineGrant = [];
 
-            // @FIXME: WebID (or hash) needs to be added to the path, as this grant is issuer AND webid specific
-            $path = $issuerHash . '/offline-grant.json';
+            $offlineGrantFile = $this->getGrantFilePath($issuerUrl, $webIdUrl);
 
-            if ($filesystem->fileExists($path)) {
-                $contents = $filesystem->read($path);
+            if ($filesystem->fileExists($offlineGrantFile)) {
+                $contents = $filesystem->read($offlineGrantFile);
                 $storedGrant = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
 
                 if (is_array($storedGrant)) {
@@ -493,6 +491,14 @@ class SolidClient
             ->setClientMetadata($clientMetadata)
             ->setIssuer($issuer)
             ->build();
+    }
+
+    private function getGrantFilePath($issuerUrl, $webIdUrl)
+    {
+        $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
+        $webIdHash = $this->hashUrl($webIdUrl, 'sha1');
+
+        return $issuerHash . '/' . $webIdHash . '.json';
     }
 
     private function getTokenClaims(TokenSetInterface $tokenSet, OidcClientInterface $oidcClient): array
@@ -582,9 +588,7 @@ class SolidClient
         $accessToken = $tokenSet->getAccessToken(); // Access token, if returned
 
         if ($this->config['useOfflineAccess'] === true) {
-            $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
-
-            $this->saveOfflineGrant($issuerHash);
+            $this->saveOfflineGrant($issuerUrl, $webIdUrl);
         }
 
         return $issuerUrl;
@@ -827,7 +831,7 @@ class SolidClient
         return $profile;
     }
 
-    private function handleOfflineAccess(OidcClientInterface $oidcClient, IssuerInterface $issuer)
+    private function handleOfflineAccess(OidcClientInterface $oidcClient, IssuerInterface $issuer, $webIdUrl)
     {
         $accessToken = null;
 
@@ -835,34 +839,34 @@ class SolidClient
         $issuerUrl = $issuerConfig['issuer'];
         $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
 
-        $persistedAccessToken = $this->session->get('solid_access_token');
-        $persistedExpiry = $this->session->get('solid_token_expiry');
-        $hasReusableAccessToken = is_string($persistedAccessToken)
-            && $persistedAccessToken !== ''
-            && is_numeric($persistedExpiry)
-            && (int) $persistedExpiry > time() + 60;
+        $sessionAccessToken = $this->session->get('solid_access_token');
+        $sessionExpiry = $this->session->get('solid_token_expiry');
+        $hasSessionAccessToken = is_string($sessionAccessToken)
+            && $sessionAccessToken !== ''
+            && is_numeric($sessionExpiry)
+            && (int) $sessionExpiry > time() + 60;
 
-        $persistedRefreshToken = $this->session->get('solid_refresh_token');
-        $hasRefreshToken = is_string($persistedRefreshToken) && $persistedRefreshToken !== '';
+        $sessionRefreshToken = $this->session->get('solid_refresh_token');
+        $hasRefreshToken = is_string($sessionRefreshToken) && $sessionRefreshToken !== '';
 
         // Offline mode: reuse previously granted consent
 
-        if ($hasReusableAccessToken) {
+        if ($hasSessionAccessToken) {
             // Reusing stored access token until it expires
-            $accessToken = $persistedAccessToken;
+            $accessToken = $sessionAccessToken;
         } elseif ($hasRefreshToken) {
             // Stored access token has expired (or is missing); refresh with the persisted refresh token.
             try {
-                $accessToken = $this->refreshTokens($oidcClient, $persistedRefreshToken);
+                $accessToken = $this->refreshTokens($oidcClient, $sessionRefreshToken);
 
-                $this->saveOfflineGrant($issuerHash);
+                $this->saveOfflineGrant($issuerUrl, $webIdUrl);
                 // Refresh token exchange succeeded; offline consent is being reused.
             } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
                 // @KLUDGE: Stored offline grant could not be refreshed: $e->getMessage(); fall back to interactive login
-                $path = $issuerHash . '/offline-grant.json';
+                $offlineGrantFile = $this->getGrantFilePath($issuerUrl, $webIdUrl);
 
-                if ($this->filesystem->fileExists($path)) {
-                    $this->filesystem->delete($path);
+                if ($this->filesystem->fileExists($offlineGrantFile)) {
+                    $this->filesystem->delete($offlineGrantFile);
                 }
 
                 foreach ([
@@ -917,7 +921,7 @@ class SolidClient
         return $accessToken;
     }
 
-    private function saveOfflineGrant($issuerHash)
+    private function saveOfflineGrant($issuerUrl, $webIdUrl)
     {
         $session = $this->session;
 
@@ -936,10 +940,10 @@ class SolidClient
             return $value !== null && $value !== '';
         });
 
-        // @FIXME: This grant is issuer AND _webid_ specific. ADD WEBID!
-        $path = $issuerHash . '/offline-grant.json';
+        $offlineGrantFile = $this->getGrantFilePath($issuerUrl, $webIdUrl);
+
         $encode = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
-        $this->filesystem->write($path, $encode);
+        $this->filesystem->write($offlineGrantFile, $encode);
     }
 }
