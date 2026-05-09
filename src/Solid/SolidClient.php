@@ -5,40 +5,19 @@ namespace Meent\WebHook\Solid;
 use EasyRdf\Graph;
 use EasyRdf\RdfNamespace;
 use EasyRdf\Resource;
-use Facile\JoseVerifier\JWK\JwksProviderBuilder;
-use Facile\OpenIDClient\AuthMethod\AuthMethodFactory;
-use Facile\OpenIDClient\AuthMethod\ClientSecretBasic;
-use Facile\OpenIDClient\AuthMethod\ClientSecretJwt;
-use Facile\OpenIDClient\AuthMethod\ClientSecretPost;
-use Facile\OpenIDClient\AuthMethod\None;
-use Facile\OpenIDClient\AuthMethod\PrivateKeyJwt;
-use Facile\OpenIDClient\AuthMethod\SelfSignedTLSClientAuth;
-use Facile\OpenIDClient\AuthMethod\TLSClientAuth;
 use Facile\OpenIDClient\Client\ClientBuilder;
 use Facile\OpenIDClient\Client\ClientInterface as OidcClientInterface;
 use Facile\OpenIDClient\Client\Metadata\ClientMetadata;
 use Facile\OpenIDClient\Issuer\IssuerBuilder;
 use Facile\OpenIDClient\Issuer\IssuerInterface;
-use Facile\OpenIDClient\Issuer\Metadata\Provider\MetadataProviderBuilder;
 use Facile\OpenIDClient\Service\AuthorizationService;
-use Facile\OpenIDClient\Service\Builder\AuthorizationServiceBuilder;
-use Facile\OpenIDClient\Service\Builder\RegistrationServiceBuilder;
 use Facile\OpenIDClient\Service\RegistrationService;
 use Facile\OpenIDClient\Token\IdTokenVerifierBuilder;
 use Facile\OpenIDClient\Token\TokenSetInterface;
 use GuzzleHttp\Client;
-use Jose\Component\Core\AlgorithmManager;
-use Jose\Component\Core\JWK;
-use Jose\Component\KeyManagement\JWKFactory;
-use Jose\Component\Signature\Algorithm\ES256;
-use Jose\Component\Signature\JWSBuilder;
-use Jose\Component\Signature\Serializer\CompactSerializer;
-use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Exception\SolidException;
 use Meent\WebHook\UrlHashTrait;
-use Psr\Http\Message\RequestInterface;
-use Psr\SimpleCache\CacheInterface;
 
 class SolidClient
 {
@@ -57,14 +36,24 @@ class SolidClient
     private RegistrationService $registration;
     private Session $session;
 
-    public function __construct(RequestInterface $request)
+    final public function __construct(array $config, array $dependencies, ?Session $session = null)
     {
-        // @FIXME: Config and Dependencies should be injected
-        $this->createConfig($request);
+        // @FIXME: Replace injected Config array with class
+        // @FIXME: Replace injected Dependency array with individual classes and/or factories
 
-        $this->session = Session::current();
+        $this->config = $config;
 
-        $this->createDependencies($this->config['httpClientConfig'], $this->config['storageLocation']);
+        $this->session = $session;
+
+        $this->authorizationService = $dependencies['authorizationService'];
+        $this->dpopProofFactory = $dependencies['dpopProofFactory'];
+        $this->filesystem = $dependencies['filesystem'];
+        $this->graph = $dependencies['graph'];
+        $this->httpClient = $dependencies['httpClient'];
+        $this->idTokenVerifierBuilder = $dependencies['idTokenVerifierBuilder'];
+        $this->issuerBuilder = $dependencies['issuerBuilder'];
+        $this->oidcClientBuilder = $dependencies['oidcClientBuilder'];
+        $this->registration = $dependencies['registration'];
 
         if (! RdfNamespace::get('solid')) {
             RdfNamespace::set('solid', 'http://www.w3.org/ns/solid/terms#');
@@ -263,184 +252,6 @@ class SolidClient
         } catch (\GuzzleHttp\Exception\RequestException $e) {
             throw SolidException::create("Could not write resource to $resourceUrl", $e);
         }
-    }
-
-    private function createConfig(RequestInterface $request)
-    {
-        // -----------------------------------------------------------------------------
-        $storageLocation = __DIR__ . '/../../build/storage/';
-
-        // -----------------------------------------------------------------------------
-        $clientConfigFile = 'client_id.json';
-
-        // @TODO: Replace generated Client ID with static JSON at $clientServer . '/' . $clientConfigFile;
-        $clientId = Utility::base64UrlEncode(random_bytes(32));
-        $clientName = 'MEENT Solid P1 Dongle Webhook';
-        $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
-        $clientRedirectUris = [
-            $clientRedirectUri,
-        ];
-        // @FIXME: Client Secret should not be hard-coded but come from the client_id.json file, or generated for first use
-        $clientSecret = 'my-client-secret';
-
-        // -----------------------------------------------------------------------------
-        $stateSigningKey = $clientSecret; // @FIXME: Use separate secret (i.e. private key) for signing, so it can be rotated
-        $stateTtlSeconds = 300;
-
-        // -----------------------------------------------------------------------------
-        // For certain issuers (like https://solidcommunity.net) PKCE is required, even for  server-to-server calls
-        // @FIXME: PKCE use should be stored in the server offline grant or metadata JSON
-        $usePkce = true;
-
-        // -----------------------------------------------------------------------------
-        $useCsrfCheck = true;
-
-        // -----------------------------------------------------------------------------
-        $useOfflineAccess = true;
-
-        // -----------------------------------------------------------------------------
-        $httpClientConfig = [
-            // Allow self-signed certificates for local development
-            // 'verify' => false,
-            // 'verify_host' => false,
-            // 'verify_peer' => false,
-        ];
-
-        $this->config = [
-            'client' => [
-                'ConfigFile' => $clientConfigFile,
-                'Id' => $clientId,
-                'Name' => $clientName,
-                'RedirectUri' => $clientRedirectUri,
-                'RedirectUris' => $clientRedirectUris,
-                'Secret' => $clientSecret,
-            ],
-            'httpClientConfig' => $httpClientConfig,
-            'state' => [
-                'SigningKey' => $stateSigningKey,
-                'TtlSeconds' => $stateTtlSeconds,
-            ],
-            'storageLocation' => $storageLocation,
-            'useCsrfCheck' => $useCsrfCheck,
-            'useOfflineAccess' => $useOfflineAccess,
-            'usePkce' => $usePkce,
-        ];
-    }
-
-    private function createDependencies($httpClientConfig, $storageLocation)
-    {
-        // -----------------------------------------------------------------------------
-        $httpClient = new Client($httpClientConfig);
-
-        // -----------------------------------------------------------------------------
-        // Create FileSystem
-        // -----------------------------------------------------------------------------
-        if ($storageLocation) {
-            $adapter = new \League\Flysystem\Local\LocalFilesystemAdapter($storageLocation);
-        } else {
-            $adapter = new \League\Flysystem\InMemory\InMemoryFilesystemAdapter();
-        }
-
-        $filesystem = new Filesystem($adapter);
-
-        // -----------------------------------------------------------------------------
-        // Create Cache Store
-        // -----------------------------------------------------------------------------
-        if ($filesystem && class_exists('\\MatthiasMullie\\Scrapbook\\Adapters\\Flysystem')) {
-            $store = new \MatthiasMullie\Scrapbook\Adapters\Flysystem($filesystem);
-        } elseif (class_exists('\\MatthiasMullie\\Scrapbook\\Adapters\\MemoryStore')) {
-            $store = new \MatthiasMullie\Scrapbook\Adapters\MemoryStore();
-        } else {
-            $store = null;
-        }
-
-        if ($store) {
-            // simple-cache implementation
-            $cache = new \MatthiasMullie\Scrapbook\Psr16\SimpleCache($store);
-        }
-
-        // -----------------------------------------------------------------------------
-        // Create OIDC Client
-        // -----------------------------------------------------------------------------
-        $metadataProviderBuilder = new MetadataProviderBuilder();
-        $issuerBuilder = new IssuerBuilder();
-
-        $metadataProviderBuilder->setHttpClient($httpClient);
-        $issuerBuilder = $issuerBuilder->setMetadataProviderBuilder($metadataProviderBuilder);
-
-        if (isset($cache) && $cache instanceof CacheInterface) {
-            $metadataProviderBuilder->setCache($cache)->setCacheTtl(86400 * 30); // Cache metadata for 30 days
-
-            $jwksProviderBuilder = new JwksProviderBuilder();
-            $jwksProviderBuilder
-                // Do not cache JWKS in this PoC:
-                // the local dev OP can rotate keys between runs, which causes false
-                // "Invalid token signature" failures when stale JWK sets are reused.
-                // ->withCache($cache)->withCacheTtl(86400)// Cache JWKS for 1 day
-                ->build();
-
-            $issuerBuilder->setJwksProviderBuilder($jwksProviderBuilder);
-        }
-
-        // RFC9449 - DPoP - Section 5.  DPoP Access Token Request
-        // Initialise DPoP key pair (stored in session so the same key is reused across the redirect round-trip).
-        if (
-            ! $this->session->has(DpopProofFactory::SESSION_KEY)
-            || ! is_array($this->session->get(DpopProofFactory::SESSION_KEY))
-            || ! isset($this->session->get(DpopProofFactory::SESSION_KEY)['kty'])) {
-            $jwk = JWKFactory::createECKey('P-256');
-            $this->session->set(DpopProofFactory::SESSION_KEY, $jwk->all());
-        } else {
-            $jwk = new JWK($this->session->get(DpopProofFactory::SESSION_KEY));
-        }
-
-        $dpopProofFactory = new DpopProofFactory(
-            $jwk,
-            new JWSBuilder(new AlgorithmManager([new ES256()])),
-            new CompactSerializer()
-        );
-
-        /*/ RFC9449 - DPoP - Section 5: DPoP proof is injected automatically by DpopAuthMethod /*/
-        $sessionHandler = $this->session;
-        $methods = [
-            new DpopAuthMethod(new ClientSecretBasic(), $dpopProofFactory, $sessionHandler),
-            new DpopAuthMethod(new ClientSecretJwt(), $dpopProofFactory, $sessionHandler),
-            new DpopAuthMethod(new ClientSecretPost(), $dpopProofFactory, $sessionHandler),
-            new DpopAuthMethod(new None(), $dpopProofFactory, $sessionHandler),
-            new DpopAuthMethod(new PrivateKeyJwt(), $dpopProofFactory, $sessionHandler),
-            new DpopAuthMethod(new TLSClientAuth(), $dpopProofFactory, $sessionHandler),
-            new DpopAuthMethod(new SelfSignedTLSClientAuth(), $dpopProofFactory, $sessionHandler),
-        ];
-        unset($sessionHandler);
-        // Initialise DPoP key pair (stored in session so the same key is reused across the redirect round-trip).
-        $dpopAuthMethodFactory = new AuthMethodFactory($methods);
-
-        $oidcClientBuilder = new ClientBuilder();
-        $oidcClientBuilder = $oidcClientBuilder
-            ->setAuthMethodFactory($dpopAuthMethodFactory)
-            ->setHttpClient($httpClient);
-
-        // ---------------------------------------------------------------------
-        $registrationServiceBuilder = new RegistrationServiceBuilder();
-        $registration = $registrationServiceBuilder->build();
-
-        $authorizationServiceBuilder = new AuthorizationServiceBuilder();
-        $authorizationService = $authorizationServiceBuilder
-            ->setHttpClient($httpClient)
-            ->build();
-
-        // ---------------------------------------------------------------------
-        $graph = new Graph();
-
-        $this->authorizationService = $authorizationService;
-        $this->dpopProofFactory = $dpopProofFactory;
-        $this->filesystem = $filesystem;
-        $this->graph = $graph;
-        $this->httpClient = $httpClient;
-        $this->idTokenVerifierBuilder = new IdTokenVerifierBuilder();
-        $this->issuerBuilder = $issuerBuilder;
-        $this->oidcClientBuilder = $oidcClientBuilder;
-        $this->registration = $registration;
     }
 
     private function createIssuerFromUrl($issuerUrl): IssuerInterface

@@ -2,10 +2,10 @@
 
 namespace Meent\WebHook\Controller;
 
-use GuzzleHttp\Psr7\Response;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Exception;
-use Meent\WebHook\Solid\SolidClient;
+use Meent\WebHook\Solid\Session;
+use Meent\WebHook\Solid\SolidClientFactory;
 use Meent\WebHook\UrlHashTrait;
 use Psr\Http\Message\RequestInterface;
 
@@ -203,7 +203,8 @@ class ApiController extends AbstractController
                 $isRedirect = isset($queryParams['code']) || isset($queryParams['error']);
                 $webIdUrl = $request->getParsedBody()['webid'] ?? $queryParams['webid'] ?? '';
 
-                $solidClient = new SolidClient($request);
+                $solidClientFactory = new SolidClientFactory();
+                $solidClient = $solidClientFactory->create($request, Session::current());
 
                 if ($isRedirect) {
                     $issuerUrl = $solidClient->handleRedirect($queryParams);
