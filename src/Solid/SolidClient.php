@@ -36,11 +36,14 @@ use Jose\Component\Signature\Serializer\CompactSerializer;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Exception\SolidException;
+use Meent\WebHook\UrlHashTrait;
 use Psr\Http\Message\RequestInterface;
 use Psr\SimpleCache\CacheInterface;
 
 class SolidClient
 {
+    use UrlHashTrait;
+
     private array $config;
 
     private AuthorizationService $authorizationService;
@@ -378,7 +381,7 @@ class SolidClient
         $issuerUrl = $issuerConfig['issuer'];
 
         // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
-        $issuerHash = hash('sha256', $issuerUrl);
+        $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
 
         // If the issuer requires pre-registration, use the initial access token provided during that process to register the oidcClient.
         $initialTokens = [$issuerHash => null];
@@ -461,7 +464,7 @@ class SolidClient
         // At this point, post redirect, the oidcClient SHOULD already be registered
         // @CHECKME: Shouldn't we "somehow" check the issuer in the state against the issuer we came from?
         //           (how do we know which issuer we are redirected back from?)
-        $issuerHash = hash('sha256', $issuerUrl);
+        $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
         $clientMetadataFile = $issuerHash . '/issuer_metadata.json';
         $fileContents = $this->filesystem->read($clientMetadataFile);
         $registeredClaims = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
@@ -595,7 +598,8 @@ class SolidClient
         $accessToken = $tokenSet->getAccessToken(); // Access token, if returned
 
         if ($this->config['useOfflineAccess'] === true) {
-            $issuerHash = hash('sha256', $issuerUrl);
+            $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
+
             $this->saveOfflineGrant($issuerHash);
         }
 
@@ -845,7 +849,7 @@ class SolidClient
 
         $issuerConfig = $issuer->getMetadata()->toArray();
         $issuerUrl = $issuerConfig['issuer'];
-        $issuerHash = hash('sha256', $issuerUrl);
+        $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
 
         $persistedAccessToken = $this->session->get('solid_access_token');
         $persistedExpiry = $this->session->get('solid_token_expiry');

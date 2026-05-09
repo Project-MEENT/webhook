@@ -6,10 +6,13 @@ use GuzzleHttp\Psr7\Response;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Exception;
 use Meent\WebHook\Solid\SolidClient;
+use Meent\WebHook\UrlHashTrait;
 use Psr\Http\Message\RequestInterface;
 
 class ApiController extends AbstractController
 {
+    use UrlHashTrait;
+
     const AVAILABLE_SUBJECTS = [
         self::SUBJECT_CONSENT,
         self::SUBJECT_DATA,
@@ -180,20 +183,6 @@ class ApiController extends AbstractController
         }
 
         return (float) ltrim($version, 'v');
-    }
-
-    private function createWebIdHash(string $webId): string
-    {
-        $url = parse_url($webId);
-
-        $webId = $url['scheme'] . ($url['scheme'] === 'http' ? 's' : '')
-            . '://'
-            . $url['host']
-            . (array_key_exists('port', $url) ? ':' . $url['port'] : '')
-            . (array_key_exists('path', $url) ? rtrim($url['path'], '/') : '');
-        $webId = strtolower($webId);
-
-        return hash('sha1', $webId);
     }
 
     private function handleConsentRequest(RequestInterface $request, $response)
@@ -413,7 +402,7 @@ HTML;
                 if ($version >= 0.3) {
                     // When data is received, it is stored in `/{webid-hash}/{timestamp}.{id}.data`
                     $filePath = vsprintf("%s/%s.%s.data", [
-                        'webIdHash' => $this->createWebIdHash($webId),
+                        'webIdHash' => $this->hashUrl($webId, 'sha1'),
                         'timestamp' => date('Ymd.His'),
                         $id,
                     ]);
@@ -466,7 +455,7 @@ HTML;
             $response['title'] = 'Invalid URL';
             $response['type'] = '/errors/';
         } else {
-            $webIdHash = $this->createWebIdHash($webId);
+            $webIdHash = $this->hashUrl($webId, 'sha1');
             $exists = $this->filesystem->directoryExists($webIdHash);
 
             if ($exists) {
