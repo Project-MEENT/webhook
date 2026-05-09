@@ -232,7 +232,11 @@ class SolidClient
         $accessToken = $tokenSet->getAccessToken(); // Access token, if returned
 
         if ($this->config['useOfflineAccess'] === true) {
-            $this->saveOfflineGrant($issuer, $webIdUrl);
+            $grant = $this->getGrantFromSession();
+
+            if ($grant !== []) {
+                $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
+            }
         }
 
         return $issuerUrl;
@@ -540,6 +544,32 @@ class SolidClient
         $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
 
         return $issuerHash . '/issuer_metadata.json';
+    }
+
+    private function getGrantFromSession()
+    {
+        $grant = [];
+
+        $session = $this->session;
+
+        if ($session !== null) {
+            $snapshot = [
+                DpopProofFactory::SESSION_KEY => $session->get(DpopProofFactory::SESSION_KEY),
+                'saved_at' => time(),
+                'solid_access_token' => $session->get('solid_access_token'),
+                'solid_refresh_token' => $session->get('solid_refresh_token'),
+                'solid_resource_url' => $session->get('solid_resource_url'),
+                'solid_storage_root' => $session->get('solid_storage_root'),
+                'solid_token_expiry' => $session->get('solid_token_expiry'),
+                'solid_webid' => $session->get('solid_webid'),
+            ];
+
+            $grant = array_filter($snapshot, static function ($value): bool {
+                return $value !== null && $value !== '';
+            });
+        }
+
+        return $grant;
     }
 
     private function getGrantFilePath(IssuerInterface $issuer, $webIdUrl)
@@ -854,8 +884,10 @@ class SolidClient
             // Stored access token has expired (or is missing); refresh with the persisted refresh token.
             try {
                 $accessToken = $this->refreshTokens($oidcClient, $sessionRefreshToken);
-
-                $this->saveOfflineGrant($issuer, $webIdUrl);
+                $grant = $this->getGrantFromSession();
+                if ($grant !== []) {
+                    $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
+                }
                 // Refresh token exchange succeeded; offline consent is being reused.
             } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
                 // @KLUDGE: Stored offline grant could not be refreshed: $e->getMessage(); fall back to interactive login
@@ -935,29 +967,12 @@ class SolidClient
         }
     }
 
-    private function saveOfflineGrant(IssuerInterface $issuer, $webIdUrl)
+    private function saveOfflineGrant(IssuerInterface $issuer, $webIdUrl, $grant)
     {
-        $session = $this->session;
-
-        $snapshot = [
-            DpopProofFactory::SESSION_KEY => $session->get(DpopProofFactory::SESSION_KEY),
-            'saved_at' => time(),
-            'solid_access_token' => $session->get('solid_access_token'),
-            'solid_refresh_token' => $session->get('solid_refresh_token'),
-            'solid_resource_url' => $session->get('solid_resource_url'),
-            'solid_storage_root' => $session->get('solid_storage_root'),
-            'solid_token_expiry' => $session->get('solid_token_expiry'),
-            'solid_webid' => $session->get('solid_webid'),
-        ];
-
-        $grant = array_filter($snapshot, static function ($value): bool {
-            return $value !== null && $value !== '';
-        });
-
         $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
-        $encode = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $encodedGrant = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
-        $this->filesystem->write($offlineGrantFile, $encode);
+        $this->filesystem->write($offlineGrantFile, $encodedGrant);
     }
 }
