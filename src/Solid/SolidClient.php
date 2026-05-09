@@ -481,7 +481,7 @@ class SolidClient
         if ($registeredClaims === []) {
             $registeredClaims = $this->registerClaims($issuer);
 
-            $clientMetadataFile = $this->getClientMetaDataFile($issuer);
+            $clientMetadataFile = $this->getClientMetaDataFilePath($issuer);
             $fileContents = json_encode($registeredClaims, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
             $this->filesystem->write($clientMetadataFile, $fileContents);
@@ -533,7 +533,7 @@ class SolidClient
             ->build();
     }
 
-    private function getClientMetaDataFile(IssuerInterface $issuer)
+    private function getClientMetaDataFilePath(IssuerInterface $issuer)
     {
         $issuerConfig = $issuer->getMetadata()->toArray();
         $issuerUrl = $issuerConfig['issuer'];
@@ -574,7 +574,7 @@ class SolidClient
     {
         $registeredClaims = [];
 
-        $clientMetadataFile = $this->getClientMetaDataFile($issuer);
+        $clientMetadataFile = $this->getClientMetaDataFilePath($issuer);
 
         $clientMetadataFileExists = $this->filesystem->fileExists($clientMetadataFile);
 
