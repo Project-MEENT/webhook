@@ -479,18 +479,7 @@ class SolidClient
         $registeredClaims = $this->getRegisteredClaims($issuer);
 
         if ($registeredClaims === []) {
-            // Client not registered, registering oidcClient...
-
-            $clientConfig = $this->getClientConfig();
-            try {
-                // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
-                // If the issuer requires pre-registration, use the initial access token provided during that process to register the oidcClient.
-                $registeredClaims = $this->registration->register($issuer, $clientConfig);
-            } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
-                // InvalidArgumentException(Issuer does not support dynamic oidcClient registration)
-                // RuntimeException(Unable to encode oidcClient metadata | Unable to register OpenID oidcClient | Registration response did not return a client_id field)
-                throw SolidException::create('Dynamic registration failed', $e);
-            }
+            $registeredClaims = $this->registerClaims($issuer);
 
             $clientMetadataFile = $this->getClientMetaDataFile($issuer);
             $fileContents = json_encode($registeredClaims, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
@@ -919,6 +908,24 @@ class SolidClient
         }
 
         return $accessToken;
+    }
+
+    private function registerClaims(IssuerInterface $issuer)
+    {
+        $issuerConfig = $issuer->getMetadata()->toArray();
+        $issuerUrl = $issuerConfig['issuer'];
+
+        // Client not registered, registering oidcClient...
+        $clientConfig = $this->getClientConfig();
+        // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
+        try {
+            // @TODO: If the issuer requires pre-registration, an initial access token (provided during registration on the oidcClient) can be provided here.
+            return $this->registration->register($issuer, $clientConfig);
+        } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
+            // InvalidArgumentException(Issuer does not support dynamic oidcClient registration)
+            // RuntimeException(Unable to encode oidcClient metadata | Unable to register OpenID oidcClient | Registration response did not return a client_id field)
+            throw SolidException::create('Dynamic registration failed', $e);
+        }
     }
 
     private function saveOfflineGrant(IssuerInterface $issuer, $webIdUrl)
