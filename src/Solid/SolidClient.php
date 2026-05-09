@@ -490,18 +490,7 @@ class SolidClient
         $clientMetadata = ClientMetadata::fromArray($registeredClaims);
 
         if ($this->config['useOfflineAccess'] === true) {
-            $offlineGrant = [];
-
-            $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
-
-            if ($this->filesystem->fileExists($offlineGrantFile)) {
-                $contents = $this->filesystem->read($offlineGrantFile);
-                $storedGrant = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
-
-                if (is_array($storedGrant)) {
-                    $offlineGrant = $storedGrant;
-                }
-            }
+            $offlineGrant = $this->getOfflineGrant($issuer, $webIdUrl);
 
             if ($offlineGrant !== []
                 && ! $this->session->has('solid_refresh_token')
@@ -561,6 +550,24 @@ class SolidClient
         $webIdHash = $this->hashUrl($webIdUrl, 'sha1');
 
         return $issuerHash . '/' . $webIdHash . '.json';
+    }
+
+    private function getOfflineGrant(IssuerInterface $issuer, $webIdUrl)
+    {
+        $offlineGrant = [];
+
+        $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
+
+        if ($this->filesystem->fileExists($offlineGrantFile)) {
+            $contents = $this->filesystem->read($offlineGrantFile);
+            $storedGrant = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+
+            if (is_array($storedGrant)) {
+                $offlineGrant = $storedGrant;
+            }
+        }
+
+        return $offlineGrant;
     }
 
     private function getRegisteredClaims(IssuerInterface $issuer)
