@@ -65,6 +65,10 @@ class SolidClient
 
     final public function fetchStorageUrls($webIdUrl)
     {
+        if (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
+            throw SolidException::create("Provided WebID '$webIdUrl' is not a valid URL");
+        }
+
         $storageUrls = [];
 
         $profile = $this->getWebIdProfile($webIdUrl);
@@ -724,10 +728,6 @@ class SolidClient
 
     private function saveOfflineGrant(IssuerInterface $issuer, $webIdUrl, $grant)
     {
-        if (! is_string($webIdUrl) || ! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
-            throw SolidException::create("Cannot persist offline grant: invalid WebID '$webIdUrl'");
-        }
-
         $grant['saved_at'] = time();
         $encodedGrant = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
