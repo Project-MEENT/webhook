@@ -31,7 +31,7 @@ use Psr\SimpleCache\CacheInterface;
 
 class SolidClientFactory
 {
-    final public function create(RequestInterface $request, ?Session $session = null): SolidClient
+    final public function create(RequestInterface $request): SolidClient
     {
         $httpClientConfig = [
             // Allow self-signed certificates for local development
@@ -45,7 +45,7 @@ class SolidClientFactory
 
         $config = $this->createConfig($request);
 
-        return new SolidClient($config, $dependencies, $session);
+        return new SolidClient($config, $dependencies);
     }
 
     final public function createConfig(RequestInterface $request): array

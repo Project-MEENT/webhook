@@ -34,16 +34,13 @@ class SolidClient
     private IdTokenVerifierBuilder $idTokenVerifierBuilder;
     private IssuerBuilder $issuerBuilder;
     private RegistrationService $registration;
-    private Session $session;
 
-    final public function __construct(array $config, array $dependencies, ?Session $session = null)
+    final public function __construct(array $config, array $dependencies)
     {
         // @FIXME: Replace injected Config array with class
         // @FIXME: Replace injected Dependency array with individual classes and/or factories
 
         $this->config = $config;
-
-        $this->session = $session;
 
         $this->authorizationService = $dependencies['authorizationService'];
         $this->dpopProofFactory = $dependencies['dpopProofFactory'];
@@ -101,7 +98,7 @@ class SolidClient
 
     // @FIXME: There is a scenario where, if the page is opened with a WebID, and there has not yet been a consent call, we will get a 403!
 
-    final public function connectWebId($webIdUrl)
+    final public function connectWebId($webIdUrl, Session $session)
     {
         $redirectAuthorizationUri = '';
 
@@ -124,13 +121,13 @@ class SolidClient
         }
 
         if ($offlineModeHandled === false) {
-            $redirectAuthorizationUri = $this->getRedirectAuthorizationUri($oidcClient, $issuer, $webIdUrl);
+            $redirectAuthorizationUri = $this->getRedirectAuthorizationUri($oidcClient, $issuer, $webIdUrl, $session);
         }
 
         return $redirectAuthorizationUri;
     }
 
-    final public function handleRedirect($queryParams): string
+    final public function handleRedirect($queryParams, Session $session): string
     {
         // Step 3. Exchange code for access token
 
@@ -159,7 +156,7 @@ class SolidClient
 
         // CSRF: validate state matches what we sent (OIDC Core Section 3.1.2.7).
         if ($this->config['useCsrfCheck'] === true) {
-            $expectedState = $this->session->get('oauth_state');
+            $expectedState = $session->get('oauth_state');
 
             if ($state !== $expectedState) {
                 $message = vsprintf(
@@ -171,7 +168,7 @@ class SolidClient
                 throw SolidException::create($message);
             }
 
-            $this->session->remove('oauth_state');
+            $session->remove('oauth_state');
         }
 
         // In callback mode, issuer is recovered exclusively from signed state.
@@ -190,7 +187,7 @@ class SolidClient
         $codeVerifier = null;
         if ($this->config['usePkce'] === true) {
             /*/ rfc7636 - PKCE - Section 4.5.  Client Sends the Authorization Code and the Code Verifier to the Token Endpoint /*/
-            $codeVerifier = $this->session->get('pkce_code_verifier');
+            $codeVerifier = $session->get('pkce_code_verifier');
             $hasValidCodeVerifier = is_string($codeVerifier) && $codeVerifier !== '';
             if (! $hasValidCodeVerifier) {
                 throw SolidException::create('Client has no valid PKCE code_verifier for this authorization response ' . $codeVerifier);
@@ -199,9 +196,9 @@ class SolidClient
 
         try {
             $tokenSet = $this->getTokenSet($oidcClient, $authorizationCode, $codeVerifier);
-            $this->session->remove('pkce_code_verifier');
+            $session->remove('pkce_code_verifier');
         } catch (\Throwable $e) {
-            $this->session->remove('pkce_code_verifier');
+            $session->remove('pkce_code_verifier');
             throw $e;
         }
 
@@ -476,7 +473,7 @@ class SolidClient
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 
-    private function getRedirectAuthorizationUri(OidcClientInterface $oidcClient, IssuerInterface $issuer, $webIdUrl)
+    private function getRedirectAuthorizationUri(OidcClientInterface $oidcClient, IssuerInterface $issuer, $webIdUrl, $session)
     {
         $issuerConfig = $issuer->getMetadata()->toArray();
         $issuerUrl = $issuerConfig['issuer'];
@@ -498,7 +495,7 @@ class SolidClient
         $state = $header . '.' . $payload . '.' . $signature;
 
         if ($this->config['useCsrfCheck'] === true) {
-            $this->session->set('oauth_state', $state);
+            $session->set('oauth_state', $state);
         }
 
         $authorizationRequestParams['state'] = $state;
@@ -507,7 +504,7 @@ class SolidClient
             /*/ rfc7636 - PKCE - Section 4.1.  Client Creates a Code Verifier /*/
             // 32 random bytes base64url-encoded → 43-char verifier in the allowed unreserved set.
             $codeVerifier = Utility::base64UrlEncode(random_bytes(32));
-            $this->session->set('pkce_code_verifier', $codeVerifier);
+            $session->set('pkce_code_verifier', $codeVerifier);
 
             /*/ rfc7636 - PKCE - Section 4.2.  Client Creates the Code Challenge /*/
             $codeVerifierHash = hash('sha256', $codeVerifier, true);

@@ -204,13 +204,13 @@ class ApiController extends AbstractController
                 $webIdUrl = $request->getParsedBody()['webid'] ?? $queryParams['webid'] ?? '';
 
                 $solidClientFactory = new SolidClientFactory();
-                $solidClient = $solidClientFactory->create($request, Session::current());
+                $solidClient = $solidClientFactory->create($request);
 
                 if ($isRedirect) {
-                    $issuerUrl = $solidClient->handleRedirect($queryParams);
+                    $issuerUrl = $solidClient->handleRedirect($queryParams, Session::current());
                     // @TODO: Redirect to self with ?webid=$webId to remove token query-params
                 } elseif ($webIdUrl !== '') {
-                    $redirectAuthorizationUri = $solidClient->connectWebId($webIdUrl);
+                    $redirectAuthorizationUri = $solidClient->connectWebId($webIdUrl, Session::current());
                 } else {
                     $showForm = true;
                 }
