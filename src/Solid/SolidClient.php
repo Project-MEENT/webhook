@@ -124,7 +124,7 @@ class SolidClient
         }
 
         if ($offlineModeHandled === false) {
-            $redirectAuthorizationUri = $this->getRedirectAuthorizationUri($oidcClient, $issuer);
+            $redirectAuthorizationUri = $this->getRedirectAuthorizationUri($oidcClient, $issuer, $webIdUrl);
         }
 
         return $redirectAuthorizationUri;
@@ -476,7 +476,7 @@ class SolidClient
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 
-    private function getRedirectAuthorizationUri(OidcClientInterface $oidcClient, IssuerInterface $issuer)
+    private function getRedirectAuthorizationUri(OidcClientInterface $oidcClient, IssuerInterface $issuer, $webIdUrl)
     {
         $issuerConfig = $issuer->getMetadata()->toArray();
         $issuerUrl = $issuerConfig['issuer'];
@@ -516,12 +516,16 @@ class SolidClient
             /*/ rfc7636 - PKCE - Section 4.3.  Client Sends the Code Challenge with the Authorization Request /*/
             $authorizationRequestParams['code_challenge'] = $codeChallenge;
             $authorizationRequestParams['code_challenge_method'] = 'S256'; // RFC7636: clients capable of S256 MUST use S256.
+        }
 
-            if ($this->config['useOfflineAccess'] === true) {
-                // offline_access requires explicit consent so the OP actually issues a refresh token (OIDC Core Section 11).
+        if ($this->config['useOfflineAccess'] === true) {
+            // offline_access requires explicit consent so the OP actually issues a refresh token (OIDC Core Section 11).
+            $grant = $this->getOfflineGrant($issuer, $webIdUrl);
+            if (empty($grant['solid_refresh_token'])) {
+                // Only Request when a reusable refresh grant is not available yet.
                 $authorizationRequestParams['prompt'] = 'consent';
-                $authorizationRequestParams['scope'] = 'openid webid offline_access';
             }
+            $authorizationRequestParams['scope'] = 'openid webid offline_access';
         }
 
         return $this->authorizationService->getAuthorizationUri($oidcClient, $authorizationRequestParams);
