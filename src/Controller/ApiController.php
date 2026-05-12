@@ -41,8 +41,22 @@ class ApiController extends AbstractController
     {
         $response['type'] = '/api/';
 
-        $subject = $this->getRequestedSubject($request);
-        $version = $this->getRequestedVersion($request);
+        try {
+            $subject = $this->getRequestedSubject($request);
+            $version = $this->getRequestedVersion($request);
+        } catch (Exception $e) {
+            $response['content'] = [[
+                'detail' => 'API version not found: '
+                    . $e->getMessage() . '. MUST be one of '
+                    . implode(', ', self::AVAILABLE_VERSIONS),
+                'pointer' => '#invalid-api-version',
+            ]];
+            $response['status'] = 404;
+            $response['title'] = 'API Version Not Found';
+            $response['type'] = '/errors/';
+
+            return $response;
+        }
 
         $response['headers']['API-Version'] = ["v$version"];
 
