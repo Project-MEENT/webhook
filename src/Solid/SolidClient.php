@@ -261,26 +261,24 @@ class SolidClient
         return $issuerUrl;
     }
 
-    final public function storeResource($resourceUrl, $resource)
-    {
-        $accessToken = $this->getAccessToken();
-
+    final public function storeResource($webIdUrl, $resourceUrl, $resource = null)
         // If there is no "offline" access, this only works after we have been redirected from the Issuer
         // @FIXME: Do we need POST or PUT? Do we expect to only create new resources for each call? Or append them to an existing resource?
-        $headers = [
-            // 'Accept' => 'text/turtle, application/ld+json', (?)
-            'Authorization' => 'DPoP ' . $accessToken,
-        ];
-        $resourceRequest = new \GuzzleHttp\Psr7\Request('POST || PUT (?)', $resourceUrl, $headers, $resource);
-        $dpopProof = $this->dpopProofFactory->createProofForRequest($resourceRequest);
-        $this->session->set('last_dpop_proof', $dpopProof);
+    {
+        if (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
+            throw SolidException::create("Provided WebID '$webIdUrl' is not a valid URL");
+        }
 
-        $resourceRequest = $resourceRequest->withHeader('DPoP', $dpopProof);
+        if (! filter_var($resourceUrl, FILTER_VALIDATE_URL)) {
+            throw SolidException::create("Provided resource URL '$resourceUrl' is not a valid URL");
+        }
+
+        $putRequest = $this->createResourceRequest('PUT', $webIdUrl, $resourceUrl, $resource, 'text/turtle');
 
         try {
-            return $this->httpClient->send($resourceRequest);
+            return $this->httpClient->send($putRequest);
         } catch (\GuzzleHttp\Exception\RequestException $e) {
-            throw SolidException::create("Could not write resource to $resourceUrl", $e);
+            throw SolidException::create("Could not store resource '$resourceUrl'", $e);
         }
     }
 
@@ -753,5 +751,33 @@ class SolidClient
 
         $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
         $this->filesystem->write($offlineGrantFile, $encodedGrant);
+    }
+
+    private function createResourceRequest($method, $webIdUrl, $resourceUrl, $resource = null, $contentType = null)
+    {
+        $issuer = $this->createIssuerFromWebIdUrl($webIdUrl);
+        $oidcClient = $this->createOidcClientFromIssuer($issuer);
+
+        // Load the persisted grant from disk and resolve a valid access token from it.
+        $accessToken = $this->handleOfflineAccess($oidcClient, $issuer, $webIdUrl);
+
+        if (! is_string($accessToken) || $accessToken === '') {
+            throw SolidException::create('No valid access token available to fetch resource. Reconnect WebID to obtain consent/tokens.');
+        }
+
+        // Build DPoP proof for this specific request target and method.
+        // Solid Protocol Section 5.3: servers MUST reject PUT, POST and PATCH without Content-Type with 400.
+        $headers = [
+            'Authorization' => 'DPoP ' . $accessToken,
+        ];
+
+        if ($contentType !== null) {
+            $headers['Content-Type'] = $contentType;
+        }
+
+        $resourceRequest = new \GuzzleHttp\Psr7\Request($method, $resourceUrl, $headers, $resource);
+        $dpopProof = $this->dpopProofFactory->createProofForRequest($resourceRequest);
+
+        return $resourceRequest->withHeader('DPoP', $dpopProof);
     }
 }
