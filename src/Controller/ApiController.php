@@ -447,6 +447,8 @@ HTML;
     private function handleRegisterPost(RequestInterface $request, $response)
     {
         $input = $request->getBody()->getContents();
+        $version = $this->getRequestedVersion($request);
+
         $webId = trim($input);
 
         if (empty($webId)) {
@@ -479,18 +481,39 @@ HTML;
                 $response['type'] = '/errors/';
             } else {
                 $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
-
                 $filePath = 'keys/' . $apiKey . '.key';
-                $this->filesystem->write($filePath, $webId);
 
-                $this->filesystem->createDirectory($webIdHash);
+                $isConnected = true;
+                if ($version >= 0.4) {
+                    $solidClientFactory = new SolidClientFactory();
+                    $solidClient = $solidClientFactory->create($request);
+                    $isConnected = $solidClient->isWebIdConnected($webId);
 
-                $response['content'] = [
-                    'api_key' => $apiKey,
-                    'webid' => $webId,
-                ];
-                $response['status'] = 201;
-                $response['title'] = 'WebID registered';
+                    if (! $isConnected) {
+                        $connectionUrl = $request->getUri()->withPath('/api/consent')->withQuery('webid=' . urlencode($webId));
+                        $response['content'] = [[
+                            'detail' => "The provided WebID '$webId' is not yet connected. To connect this WebID, visit: $connectionUrl",
+                            'pointer' => '#webid-not-connected',
+                        ]];
+                        $response['status'] = 407;
+                        $response['title'] = 'WebID Authentication Required';
+                        $response['type'] = '/errors/';
+                        // @CHECKME: Add Location header?
+                        // $response['headers']['Location'] = [$connectionUrl];
+                    }
+                }
+
+                if ($isConnected === true) {
+                    $this->filesystem->write($filePath, $webId);
+                    $this->filesystem->createDirectory($webIdHash);
+
+                    $response['content'] = [
+                        'api_key' => $apiKey,
+                        'webid' => $webId,
+                    ];
+                    $response['status'] = 201;
+                    $response['title'] = 'WebID registered';
+                }
             }
         }
 
