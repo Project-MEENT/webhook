@@ -302,6 +302,14 @@ class SolidClient
         }
     }
 
+    final public function isWebIdConnected($webIdUrl)
+    {
+        $issuer = $this->createIssuerFromWebIdUrl($webIdUrl);
+
+        $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
+
+        return $this->filesystem->fileExists($offlineGrantFile);
+    }
     private function createIssuerFromUrl($issuerUrl): IssuerInterface
     {
         $issuerUrl = rtrim($issuerUrl, '/');
