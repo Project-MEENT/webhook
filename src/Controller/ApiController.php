@@ -278,6 +278,7 @@ HTML;
                 $response = $this->handleAllowedHttpMethods($response, $allowedMethods);
             break;
 
+            case 'DELETE':
             case 'PATCH':
             case 'PUT':
                 $response = $this->handleMethodNotAllowed($response, $request, $allowedMethods);
@@ -327,7 +328,6 @@ HTML;
     {
         $version = $this->getRequestedVersion($request);
 
-
         if ($version >= 0.3) {
             $authError = $this->checkAuthorization($request, $response);
 
@@ -338,8 +338,8 @@ HTML;
 
         $filePath = $this->getRequestedObject($request);
 
-        $isValidPath = strpos($filePath, '/') === false || ! str_ends_with($filePath, '.data');
-        if ($isValidPath) {
+        $isInvalidPath = strpos($filePath, '/') === false || ! str_ends_with($filePath, '.data');
+        if ($isInvalidPath) {
             $response['content'] = [[
                 'detail' => 'Invalid path',
                 'pointer' => '#invalid-path',
