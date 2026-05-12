@@ -508,7 +508,7 @@ HTML;
 
                 case 'PUT':
                     // @TODO: Add PUT method to update WebID (requires API key)
-                    $response = $this->handleMethodNotAllowed($response, $request, $allowedMethods);
+                    $response = $this->handleMethodNotImplemented($response, $request, $allowedMethods);
                 break;
             }
         } else {

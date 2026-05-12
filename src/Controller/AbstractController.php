@@ -55,6 +55,21 @@ abstract class AbstractController
         return $response;
     }
 
+    final protected function handleMethodNotImplemented($response, RequestInterface $request, array $allowedMethods)
+    {
+        $response['content'] = [[
+            'detail' => "Method '{$request->getMethod()}' is not implemented, MUST be"
+                . (count($allowedMethods) > 1 ? 'one of ' : '')
+                . implode(', ', $allowedMethods),
+            'pointer' => '#method-not-implemented',
+        ]];
+        $response['status'] = 501;
+        $response['title'] = 'Method Not Implemented';
+        $response['type'] = '/errors/';
+
+        return $response;
+    }
+
     final protected function handleNotFound(RequestInterface $request, array $response)
     {
         $requestUri = $request->getUri()->getPath();
