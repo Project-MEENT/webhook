@@ -229,6 +229,13 @@ class SolidClient
         // Persist tokens for offline operation — written directly to the grant file,
         // Store refresh_token server-side; never expose to browser (OIDC Core Section 12).
         if ($this->config['useOfflineAccess'] === true) {
+            $refreshToken = $tokenSet->getRefreshToken();
+            if (! is_string($refreshToken) || $refreshToken === '') {
+                throw SolidException::create(
+                    'Provider did not return a refresh_token. Ensure offline_access is requested and consent is granted.'
+                );
+            }
+
             $expiresIn = $tokenSet->getExpiresIn();
             // @CHECKME: Not sure which should come first, the expiry form the token or from the id_token
             if ($expiresIn > 0) {
@@ -241,7 +248,7 @@ class SolidClient
 
             $grant = array_filter([
                 'solid_access_token'   => $tokenSet->getAccessToken(),
-                'solid_refresh_token'  => $tokenSet->getRefreshToken(),
+                'solid_refresh_token'  => $refreshToken,
                 'solid_token_expiry'   => $tokenExpiry,
                 'solid_webid'          => $webIdUrl,
             ], static function ($value) {
@@ -714,6 +721,8 @@ class SolidClient
             $grant['solid_token_expiry'] = $expiresIn > 0 ? time() + $expiresIn : time() + 3600;
 
             $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
+        } else {
+            throw SolidException::create('No persisted offline grant with refresh_token is available. Reconnect WebID once to grant offline access.');
         }
 
         return $accessToken;
