@@ -258,7 +258,7 @@ class SolidClient
             $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
         }
 
-        return $issuerUrl;
+        return $webIdUrl;
     }
 
     final public function fetchResource($webIdUrl, $resourceUrl)

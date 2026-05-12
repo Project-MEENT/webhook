@@ -211,6 +211,7 @@ class ApiController extends AbstractController
                 // @FIXME: Try/Catch + Error handling
 
                 $showForm = false;
+                $redirectUri = '';
 
                 // Detect whether this request is the callback from the authorization server.
                 // When the OP redirects back it always includes `code` (success) or `error` (failure).
@@ -221,19 +222,28 @@ class ApiController extends AbstractController
                 $solidClient = $solidClientFactory->create($request);
 
                 if ($isRedirect) {
-                    $issuerUrl = $solidClient->handleRedirect($queryParams, Session::current());
-                    // @TODO: Redirect to self with ?webid=$webId to remove token query-params
-                } elseif ($webIdUrl !== '') {
-                    $redirectAuthorizationUri = $solidClient->connectWebId($webIdUrl, Session::current());
-                } else {
+                    $webIdUrl = $solidClient->handleRedirect($queryParams, Session::current());
+                    $redirectUri = $this->getBaseUrl($request) . '/api/consent?webid=' . urlencode($webIdUrl);
+                } elseif ($webIdUrl === '') {
                     $showForm = true;
+                } elseif (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
+                    $response['content'] = [[
+                        'detail' => "Provided WebID '$webIdUrl' is not a valid URL",
+                        'pointer' => '#invalid-url',
+                    ]];
+                    $response['status'] = 422;
+                    $response['title'] = 'Invalid URL';
+                    $response['type'] = '/errors/';
+                    break;
+                } else {
+                    $redirectUri = $solidClient->connectWebId($webIdUrl, Session::current());
                 }
 
                 // Create Response
-                if (! empty($redirectAuthorizationUri)) {
+                if (! empty($redirectUri)) {
                     $response['status'] = 302;
-                    $response['headers']['Location'] = [$redirectAuthorizationUri];
-                } else {
+                    $response['headers']['Location'] = [$redirectUri];
+                } elseif (empty($response['content'])) {
                     $template = $this->getContents('template');
 
                     $content = [
