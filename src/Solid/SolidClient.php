@@ -261,6 +261,26 @@ class SolidClient
         return $issuerUrl;
     }
 
+    final public function fetchResource($webIdUrl, $resourceUrl)
+    {
+        if (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
+            throw SolidException::create("Provided WebID '$webIdUrl' is not a valid URL");
+        }
+
+        if (! filter_var($resourceUrl, FILTER_VALIDATE_URL)) {
+            throw SolidException::create("Provided resource URL '$resourceUrl' is not a valid URL");
+        }
+
+        $resourceRequest = $this->createResourceRequest('GET', $webIdUrl, $resourceUrl);
+
+        try {
+            return $this->httpClient->send($resourceRequest);
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            throw SolidException::create("Could not fetch resource '$resourceUrl'", $e);
+        }
+
+    }
+
     final public function storeResource($webIdUrl, $resourceUrl, $resource = null)
         // If there is no "offline" access, this only works after we have been redirected from the Issuer
         // @FIXME: Do we need POST or PUT? Do we expect to only create new resources for each call? Or append them to an existing resource?
