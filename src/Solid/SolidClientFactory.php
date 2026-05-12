@@ -26,6 +26,7 @@ use Jose\Component\Signature\Algorithm\ES256;
 use Jose\Component\Signature\JWSBuilder;
 use Jose\Component\Signature\Serializer\CompactSerializer;
 use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemOperator;
 use Psr\Http\Message\RequestInterface;
 use Psr\SimpleCache\CacheInterface;
 
@@ -43,25 +44,39 @@ class SolidClientFactory
         $storageLocation = __DIR__ . '/../../build/storage/';
         $dependencies = $this->createDependencies($httpClientConfig, $storageLocation);
 
-        $config = $this->createConfig($request);
+        $config = $this->createConfig($request, $dependencies['filesystem']);
 
         return new SolidClient($config, $dependencies);
     }
 
-    final public function createConfig(RequestInterface $request): array
+    final public function createConfig(RequestInterface $request, FilesystemOperator $filesystem): array
     {
         // -----------------------------------------------------------------------------
-        $clientConfigFile = 'client_id.json';
+        $clientConfigFile = 'client_metadata.json';
 
-        // @TODO: Replace generated Client ID with static JSON at $clientServer . '/' . $clientConfigFile;
-        $clientId = Utility::base64UrlEncode(random_bytes(32));
-        $clientName = 'MEENT Solid P1 Dongle Webhook';
-        $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
-        $clientRedirectUris = [
-            $clientRedirectUri,
-        ];
-        // @FIXME: Client Secret should not be hard-coded but come from the client_id.json file, or generated for first use
-        $clientSecret = 'my-client-secret';
+        $clientConfig = [];
+        if ($filesystem->fileExists($clientConfigFile)) {
+            try {
+                $contents = json_decode($filesystem->read($clientConfigFile), true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($contents)) {
+                    $clientConfig = $contents;
+                }
+            } catch (\JsonException $e) {
+                // Invalid persisted JSON; regenerate below.
+            }
+        }
+
+        // Keep client_id only when explicitly configured (static registration or Client URI "${clientServer}/${clientConfigFile}")
+        $clientId = $clientConfig['client_id'] ?? null;
+        $clientName = $clientConfig['client_name'] ?? 'MEENT Solid P1 Dongle Webhook';
+        if (isset($clientConfig['redirect_uris'])) {
+            $clientRedirectUris = $clientConfig['redirect_uris'];
+            $clientRedirectUri = reset($clientRedirectUris);
+        } else {
+            $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
+            $clientRedirectUris = [ $clientRedirectUri ];
+        }
+        $clientSecret = $clientConfig['client_secret'] ?? Utility::base64UrlEncode(random_bytes(32));
 
         // -----------------------------------------------------------------------------
         $stateSigningKey = $clientSecret; // @FIXME: Use separate secret (i.e. private key) for signing, so it can be rotated

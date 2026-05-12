@@ -116,11 +116,19 @@ class SolidClient
 
         $offlineModeHandled = false;
 
-        if ($this->config['useOfflineAccess'] === true) {
-            $accessToken = $this->handleOfflineAccess($oidcClient, $issuer, $webIdUrl);
+        $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
-            if (is_string($accessToken) && $accessToken !== '') {
-                $offlineModeHandled = true;
+        // On first connect, there is no grant, so skip directly to interactive auth flow.
+        if ($this->config['useOfflineAccess'] === true && $this->filesystem->fileExists($offlineGrantFile)) {
+            try {
+                $accessToken = $this->handleOfflineAccess($oidcClient, $issuer, $webIdUrl);
+
+                if (is_string($accessToken) && $accessToken !== '') {
+                    $offlineModeHandled = true;
+                }
+            } catch (SolidException $e) {
+                // If offline refresh fails, continue with interactive authorization flow.
+                $offlineModeHandled = false;
             }
         }
 
@@ -451,12 +459,15 @@ class SolidClient
         if (! $filesystem->fileExists($clientConfigFile)) {
             // Client metadata file not found, creating...
             $data = [
-                'client_id' => $clientId,
                 'client_name' => $clientName,
                 'client_secret' => $clientSecret,
                 'redirect_uris' => $clientRedirectUris,
                 'token_endpoint_auth_method' => 'client_secret_basic', // the auth method for the token endpoint
             ];
+
+            if (is_string($clientId) && $clientId !== '') {
+                $data['client_id'] = $clientId;
+            }
 
             if ($this->config['useOfflineAccess'] === true) {
                 // grant_types must include refresh_token to receive one (OIDC Core Section 11 / offline_access)
