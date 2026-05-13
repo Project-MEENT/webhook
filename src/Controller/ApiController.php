@@ -259,7 +259,7 @@ class ApiController extends AbstractController
                     $response['status'] = 422;
                     $response['title'] = 'Invalid URL';
                     $response['type'] = '/errors/';
-                } elseif ($webIdConnected) {
+                } elseif ($webIdConnected || $solidClient->isWebIdConnected($webIdUrl)) {
                     $content['header'] = "<p>Your P1 dongle can now be connected to your Solid Pod, using WebID <a href='$webIdUrl'>$webIdUrl</a></p>";
                     $content['title'] = 'Consent Provided';
                 } else {
