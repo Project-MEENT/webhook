@@ -223,7 +223,7 @@ class ApiController extends AbstractController
 
                 // Detect whether this request is the callback from the authorization server.
                 // When the OP redirects back it always includes `code` (success) or `error` (failure).
-                $isRedirect = isset($queryParams['code']) || isset($queryParams['error']);
+                $isRedirect = isset($queryParams['code']);
                 $webIdConnected = isset($queryParams['connected']);
                 $webIdUrl = $request->getParsedBody()['webid']
                     ?? $queryParams['webid']
@@ -233,7 +233,15 @@ class ApiController extends AbstractController
                 $solidClientFactory = new SolidClientFactory();
                 $solidClient = $solidClientFactory->create($request);
 
-                if ($isRedirect) {
+                if (isset($queryParams['error'])) {
+                    $response['content'] = [[
+                        'detail' => 'The Provider returned an error: "' . urldecode($queryParams['error']) . '"',
+                        'pointer' => '#provider-error',
+                    ]];
+                    $response['status'] = 502;
+                    $response['title'] = 'Invalid URL';
+                    $response['type'] = '/errors/';
+                } elseif ($isRedirect) {
                     $webIdUrl = $solidClient->handleRedirect($queryParams, Session::current());
                     $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
                 } elseif (! $webIdUrl) {
