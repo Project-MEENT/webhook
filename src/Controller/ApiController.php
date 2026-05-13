@@ -26,6 +26,15 @@ class ApiController extends AbstractController
         'v0.4', // Provide consent
     ];
 
+    private const EMPTY_CONTENT = [
+        'footer' => '',
+        'header' => '',
+        'main' => '',
+        'script' => '',
+        'style' => '',
+        'title' => '',
+    ];
+
     private const SUBJECT_CONSENT = 'consent';
     private const SUBJECT_DATA = 'data';
     private const SUBJECT_REGISTER = 'register';
@@ -210,22 +219,30 @@ class ApiController extends AbstractController
             case 'POST':
                 // @FIXME: Try/Catch + Error handling
 
-                $showForm = false;
                 $redirectUri = '';
 
                 // Detect whether this request is the callback from the authorization server.
                 // When the OP redirects back it always includes `code` (success) or `error` (failure).
                 $isRedirect = isset($queryParams['code']) || isset($queryParams['error']);
-                $webIdUrl = $request->getParsedBody()['webid'] ?? $queryParams['webid'] ?? '';
+                $webIdConnected = isset($queryParams['connected']);
+                $webIdUrl = $request->getParsedBody()['webid']
+                    ?? $queryParams['webid']
+                    ?? $queryParams['connected']
+                    ?? null;
 
                 $solidClientFactory = new SolidClientFactory();
                 $solidClient = $solidClientFactory->create($request);
 
                 if ($isRedirect) {
                     $webIdUrl = $solidClient->handleRedirect($queryParams, Session::current());
-                    $redirectUri = $this->getBaseUrl($request) . '/api/consent?webid=' . urlencode($webIdUrl);
-                } elseif ($webIdUrl === '') {
-                    $showForm = true;
+                    $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
+                } elseif (! $webIdUrl) {
+                    $form = file_get_contents(__DIR__ . '/../content/forms/consent.html');
+
+                    $content['header'] = '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>';
+                    $content['main'] = "<section>$form</section><section><output></output></section>";
+                    $content['script'] = file_get_contents(__DIR__ . '/../content/forms/form.js');
+                    $content['title'] = 'Provide consent';
                 } elseif (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
                     $response['content'] = [[
                         'detail' => "Provided WebID '$webIdUrl' is not a valid URL",
@@ -234,7 +251,9 @@ class ApiController extends AbstractController
                     $response['status'] = 422;
                     $response['title'] = 'Invalid URL';
                     $response['type'] = '/errors/';
-                    break;
+                } elseif ($webIdConnected) {
+                    $content['header'] = "<p>Your P1 dongle can now be connected to your Solid Pod, using WebID <a href='$webIdUrl'>$webIdUrl</a></p>";
+                    $content['title'] = 'Consent Provided';
                 } else {
                     $redirectUri = $solidClient->connectWebId($webIdUrl, Session::current());
                 }
@@ -243,42 +262,9 @@ class ApiController extends AbstractController
                 if (! empty($redirectUri)) {
                     $response['status'] = 302;
                     $response['headers']['Location'] = [$redirectUri];
-                } elseif (empty($response['content'])) {
+                } elseif (isset($content)) {
+                    $content = array_merge(self::EMPTY_CONTENT, $content);
                     $template = $this->getContents('template');
-
-                    $content = [
-                        'footer' => '',
-                        'header' => '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
-                        'main' => '<section></section>',
-                        'script' => '',
-                        'style' => "h2 { width: 100%; }\ntitle { display: inline; }",
-                        'title' => 'Provide consent',
-                    ];
-
-                    if ($showForm) {
-                        $content['main'] = <<<'HTML'
-                <section>
-                    <form enctype="application/x-www-form-urlencoded" method="POST">
-                    <fieldset><legend>WebID URL</legend>
-                        <label>Please provide the URL of your Solid WebID:
-                            <input
-                                name="webid"
-                                placeholder="https://idp.example.com/"
-                                required
-                                type="url"
-                                value=""
-                            />
-                        </label>
-                    </fieldset>
-                        <button>Connect</button>
-                    </form>
-                </section>
-HTML;
-                    } else {
-                        $content['header'] = '<p>Your P1 dongle can now be connected to your Solid Pod</p>';
-                        $content['title'] = 'Consent Provided';
-                    }
-
                     $response['content'] = vsprintf($template, $content);
                 }
             break;
