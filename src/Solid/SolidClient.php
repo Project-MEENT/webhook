@@ -119,7 +119,7 @@ class SolidClient
         $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
         // On first connect, there is no grant, so skip directly to interactive auth flow.
-        if ($this->config['useOfflineAccess'] === true && $this->filesystem->fileExists($offlineGrantFile)) {
+        if ($this->config['useOfflineAccess'] === true && ! $this->filesystem->fileExists($offlineGrantFile)) {
             try {
                 $accessToken = $this->handleOfflineAccess($oidcClient, $issuer, $webIdUrl);
 
