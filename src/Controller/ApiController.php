@@ -795,8 +795,21 @@ class ApiController extends AbstractController
     private function handleRootRequest(RequestInterface $request, $response)
     {
         $uriRoot = $this->getBaseUrl($request);
+        $apiRoot = $uriRoot . '/api/';
 
-        $response['content'] = "For more information, visit $uriRoot";
+        $data = [
+            'available_versions' => self::AVAILABLE_VERSIONS,
+            'available_endpoints' => [
+                'api_url' => $apiRoot,
+                'consent_url' => $apiRoot . self::SUBJECT_CONSENT,
+                'data_url' => $apiRoot . self::SUBJECT_DATA,
+                'registration_url' => $apiRoot . self::SUBJECT_REGISTER,
+
+            ],
+            'documentation_url' => "$uriRoot/docs",
+        ];
+
+        $response['content'] = $data;
         $response['title'] = 'MEENT Webhook';
 
         return $response;
