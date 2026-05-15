@@ -2,6 +2,10 @@ title {
     display: inline;
 }
 
+header ol {
+    text-align: left;
+}
+
 main h2 {
     width: 100%;
 }
