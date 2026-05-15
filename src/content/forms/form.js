@@ -59,6 +59,15 @@ document.querySelectorAll('form').forEach(form => {
                 if (response.headers.get('Location')) {
                     let url = new URL(response.headers.get('Location'))
 
+                    const localUrl = new URL(window.location.href)
+                    if (url.origin !== localUrl.origin) {
+                        // If the URL is in the Solid Pod we need to patch it
+                        const pathName = `${localUrl.pathname}/${url.pathname}`
+                        url = localUrl
+                        // Squash duplicate slashes
+                        url.pathname = pathName.replace(/\/{2,}/g, '/')
+                    }
+
                     if (apiKey) {
                         url.searchParams.set('api-key', apiKey)
                     }

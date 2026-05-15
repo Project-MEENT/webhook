@@ -322,6 +322,25 @@ class ApiController extends AbstractController
     private function handleDataGet(RequestInterface $request, $response)
     {
         $version = $this->getRequestedVersion($request);
+        $queryParams = $request->getQueryParams();
+
+        if ($version >= 0.4 && ! $request->getHeaderLine('Authorization')) {
+            $template = $this->getContents('template');
+            $form = file_get_contents(__DIR__ . '/../content/forms/data.html');
+
+            $content = [
+                'header' => '<p>To write data to a Solid Pod, please provide authentication and data</p>',
+                'main' => "<section>$form</section><section><output></output></section>",
+                'script' => file_get_contents(__DIR__ . '/../content/forms/form.js'),
+                'title' => 'Post content',
+            ];
+
+            $content = array_merge(self::EMPTY_CONTENT, $content);
+            $template = $this->getContents('template');
+            $response['content'] = vsprintf($template, $content);
+
+            return $response;
+        }
 
         if ($version >= 0.3) {
             $authError = $this->checkAuthorization($request, $response);

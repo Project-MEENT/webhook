@@ -1,0 +1,32 @@
+<form action="/api/data/" data-js="data-form" method="POST">
+    <p>To make it easier to develop and demo the webhook, this form is provided</p>
+    <p>
+        The form below mimics the Dongle behavior, so it is possible to show the working of the webhook without a dongle
+    </p>
+    <fieldset data-js="headers">
+        <legend>Headers (sent by dongle)</legend>
+        <label>Authorization<input name="Authorization" placeholder="Bearer <token>" type="text"></label>
+    </fieldset>
+    <fieldset>
+        <legend>API Version</legend>
+        <label>
+            <select name="api-version">
+                <option value="v0">v0</option>
+                <optgroup label="v0.*">
+                    <option value="v0.1">v0.1</option>
+                    <option value="v0.2">v0.2</option>
+                    <option value="v0.3">v0.3</option>
+                    <option value="v0.4">v0.4</option>
+                </optgroup>
+                <option selected value="">latest</option>
+            </select>
+        </label>
+    </fieldset>
+    <fieldset>
+        <legend>P1 Data (JSON format)</legend>
+        <label>
+            <textarea placeholder="Dongle data goes here..." rows="20"></textarea>
+        </label>
+    </fieldset>
+    <button type="submit">Submit</button>
+</form>
