@@ -733,13 +733,40 @@ class ApiController extends AbstractController
     private function handleRegisterRequest(RequestInterface $request, $response)
     {
         $requestMethod = $request->getMethod();
+        $queryParams = $request->getQueryParams();
+
         $version = $this->getRequestedVersion($request);
 
         if ($version > 0.2) {
             $allowedMethods = ['POST'];
+            if ($version >= 0.4) {
+                $allowedMethods[] = 'GET';
+            }
 
             switch ($requestMethod) {
                 case 'GET':
+                    if ($version >= 0.4) {
+                        $webIdUrl = $queryParams['webid'] ?? '';
+
+                        $formContents = file_get_contents(__DIR__ . '/../content/forms/register.html');
+                        $form = vsprintf($formContents, [
+                            'webId' => $webIdUrl,
+                        ]);
+
+                        $content = [
+                            'header' => '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
+                            'main' => "<section>$form</section><section><output></output></section>",
+                            'script' => file_get_contents(__DIR__ . '/../content/forms/form.js'),
+                            'title' => 'Provide consent',
+                        ];
+
+                        $content = array_merge(self::EMPTY_CONTENT, $content);
+                        $template = $this->getContents('template');
+                        $response['content'] = vsprintf($template, $content);
+                    } else {
+                        $response = $this->handleMethodNotAllowed($response, $request, $allowedMethods);
+                    }
+                break;
                 case 'PATCH':
                     $response = $this->handleMethodNotAllowed($response, $request, $allowedMethods);
                 break;
