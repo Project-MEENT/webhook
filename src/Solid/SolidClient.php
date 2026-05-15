@@ -18,6 +18,7 @@ use GuzzleHttp\Client;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Exception\SolidException;
 use Meent\WebHook\UrlHashTrait;
+use Psr\Http\Message\ResponseInterface;
 
 class SolidClient
 {
@@ -261,7 +262,7 @@ class SolidClient
         return $webIdUrl;
     }
 
-    final public function fetchResource($webIdUrl, $resourceUrl)
+    final public function fetchResource($webIdUrl, $resourceUrl): ResponseInterface
     {
         if (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
             throw SolidException::create("Provided WebID '$webIdUrl' is not a valid URL");
@@ -310,6 +311,7 @@ class SolidClient
 
         return $this->filesystem->fileExists($offlineGrantFile);
     }
+
     private function createIssuerFromUrl($issuerUrl): IssuerInterface
     {
         $issuerUrl = rtrim($issuerUrl, '/');
@@ -369,7 +371,7 @@ class SolidClient
             ->build();
     }
 
-    private function getClaims(IssuerInterface $issuer): mixed
+    private function getClaims(IssuerInterface $issuer): array
     {
         // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
         $registeredClaims = $this->getRegisteredClaims($issuer);
@@ -424,7 +426,7 @@ class SolidClient
         return $offlineGrant;
     }
 
-    private function getRegisteredClaims(IssuerInterface $issuer)
+    private function getRegisteredClaims(IssuerInterface $issuer): array
     {
         $registeredClaims = [];
 
@@ -435,7 +437,11 @@ class SolidClient
         if ($clientMetadataFileExists) {
             // Client already registered, reading metadata from file
             $fileContents = $this->filesystem->read($clientMetadataFile);
-            $registeredClaims = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
+            // json_decode can return null for a literal JSON null value; only accept arrays.
+            if (is_array($decoded)) {
+                $registeredClaims = $decoded;
+            }
         }
 
         return $registeredClaims;
@@ -756,9 +762,6 @@ class SolidClient
 
     private function registerClaims(IssuerInterface $issuer)
     {
-        $issuerConfig = $issuer->getMetadata()->toArray();
-        $issuerUrl = $issuerConfig['issuer'];
-
         // Client not registered, registering oidcClient...
         $clientConfig = $this->getClientConfig();
         // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
