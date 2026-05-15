@@ -2,8 +2,11 @@
 
 namespace Meent\WebHook\Controller;
 
+use EasyRdf\Graph;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Exception;
+use Meent\WebHook\Exception\SolidException;
+use Meent\WebHook\Record;
 use Meent\WebHook\Solid\Session;
 use Meent\WebHook\Solid\SolidClientFactory;
 use Meent\WebHook\UrlHashTrait;
@@ -472,9 +475,6 @@ class ApiController extends AbstractController
                 $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
             }
 
-            // Connect to Solid Pod (using ? see Solid Specs)
-
-            // Write data to Solid Pod (@TODO: Decide on path / resource container)
             $message = 'Records written';
 
             if ($version >= 0.2) {
@@ -494,9 +494,140 @@ class ApiController extends AbstractController
                     $filePath = "$timestamp.$id.data";
                 }
 
-                $this->filesystem->write($filePath, $data);
+                // Received data is written locally as-is
+                $this->filesystem->write($filePath, $input);
 
-                if ($version >= 0.3) {
+                if ($version >= 0.4) {
+                    try {
+                        $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $e) {
+                        $response['content'] = [[
+                            'detail' => 'Provided data is not valid JSON: ' . $e->getMessage(),
+                            'pointer' => '#invalid-json',
+                        ]];
+                        $response['status'] = 422;
+                        $response['title'] = 'Invalid JSON';
+                        $response['type'] = '/errors/';
+
+                        return $response;
+                    }
+
+                    // The received JSON data MUST contain a "timestamp" value, which indicates the time the data was recorded.
+                    // If we do not have a timestamp, the data can not be used in a time series, but it can also not be stored in the Pod
+                    // as the timestamp is needed to build the resource path.
+                    if (! isset($data['timestamp'])) {
+                        $response['content'] = [[
+                            'detail' => 'Missing required "timestamp" value in the provided data',
+                            'pointer' => '#missing-timestamp',
+                        ]];
+                        $response['status'] = 422;
+                        $response['title'] = 'Missing timestamp';
+                        $response['type'] = '/errors/';
+
+                        return $response;
+                    } elseif (! strtotime($data['timestamp']) && ! strtotime('@'.$data['timestamp'])) {
+                        $response['content'] = [[
+                            'detail' => 'Provided "timestamp" is not a valid timestamp.',
+                            'pointer' => '#invalid-timestamp',
+                        ]];
+                        $response['status'] = 422;
+                        $response['title'] = 'Invalid timestamp';
+                        $response['type'] = '/errors/';
+
+                        return $response;
+                    } else {
+                        $timestamp = $data['timestamp'];
+                        if (is_numeric($timestamp)) {
+                            $timestamp = '@' . $timestamp;
+                        }
+                        $dateTime = new \DateTimeImmutable($timestamp);
+                        $dateTime->setTimezone(new \DateTimeZone('Europe/Amsterdam'));
+                        $timestamp = $dateTime->format('Ymd.His');
+
+                        $solidClientFactory = new SolidClientFactory();
+                        $solidClient = $solidClientFactory->create($request);
+
+                        // @FIXME: Read StorageUrl from persistent configuration instead of resolving it on every request.
+                        if (empty($storageUrl)) {
+                            $storageUrls = $solidClient->fetchStorageUrls($webId);
+
+                            if ($storageUrls !== []) {
+                                // @KLUDGE: As there is no user available here, we cannot ask them which storage to use
+                                $storageUrlRoot = reset($storageUrls);
+                                $storageUrl = rtrim($storageUrlRoot, '/');
+                                // @FIXME: Store $storageUrl (where?)
+                            }
+
+                            if (empty($storageUrl)) {
+                                $response['content'] = [[
+                                    'detail' => 'No Storage URL found for the WebID, cannot store data in Solid Pod',
+                                    'pointer' => '#no-storage-url',
+                                ]];
+                                $response['status'] = 422;
+                                $response['title'] = 'No Storage URL';
+                                $response['type'] = '/errors/';
+
+                                return $response;
+                            }
+                        }
+
+                        $url = vsprintf('%s/%s/%s/%s', [
+                            'root' => $storageUrl,
+                            'path' => 'MEENT/p1',
+                            'container' => $dateTime->format('Ymd'),
+                            'resource' => $timestamp . '.ttl',
+                        ]);
+
+                        try {
+                            $graph = new Graph($url);
+                            $record = new Record($graph);
+
+                            $turtle = $record
+                                ->populate((array) $data)
+                                ->serialise('turtle')
+                            ;
+                        } catch (\Exception $e) {
+                            $response['content'] = [[
+                                'detail' => 'Could not convert data to Turtle: ' . $e->getMessage(),
+                                'pointer' => '#data-conversion-error',
+                            ]];
+                            $response['status'] = 500;
+                            $response['title'] = 'Data conversion error';
+                            $response['type'] = '/errors/';
+
+                            return $response;
+                        }
+
+                        try {
+                            $result = $solidClient->storeResource($webId, $url, $turtle, 'text/turtle');
+                        } catch (SolidException $e) {
+                            $response['content'] = [[
+                                'detail' => 'Could not write resource to Solid Pod: ' . $e->getMessage(),
+                                'pointer' => '#solid-write-error',
+                            ]];
+                            $response['status'] = 502;
+                            $response['title'] = 'Solid write error';
+                            $response['type'] = '/errors/';
+
+                            return $response;
+                        }
+
+                        if (isset($result)) {
+                            // Remove local copy, as the raw data has been saved in the Pod
+                            try {
+                                $this->filesystem->delete($filePath);
+                            } catch (\Exception $e) {
+                                // We do not care if the delete fails, as the "retry" logic can handle this later
+                                // The retry logic should first check if the file hasn't already been written to the remote.
+                            }
+
+                            $data = null;
+                            // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
+                            $response['headers']['Location'] = [$url];
+                            $statuscode = 201;
+                        }
+                    }
+                } elseif ($version >= 0.3) {
                     $url = $this->getBaseUrl($request) . '/api/data/' . $filePath;
                     $data = null;
                     $statuscode = 201;
@@ -506,6 +637,7 @@ class ApiController extends AbstractController
                 } else {
                     $data = $input;
                     $message .= ' to ' . $filePath;
+                    $statuscode = 201;
                 }
             } else {
                 $data = $input;
