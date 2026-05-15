@@ -371,11 +371,25 @@ class SolidClient
 
     private function getClaims(IssuerInterface $issuer): array
     {
+        $localClientConfig = $this->getClientConfig();
+        $localClientId = $localClientConfig['client_id'] ?? null;
+
+        if (is_string($localClientId) && filter_var($localClientId, FILTER_VALIDATE_URL)) {
+            // Client ID Document mode: use the local config directly, no registration.
+            return $localClientConfig;
+        }
+
         // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
         $registeredClaims = $this->getRegisteredClaims($issuer);
 
-        if ($registeredClaims === []) {
+        if (empty($registeredClaims) || !isset($registeredClaims['client_id'])) {
             $registeredClaims = $this->registerClaims($issuer);
+
+            if (!isset($registeredClaims['client_id'])) {
+                throw SolidException::create(
+                    'Dynamic registration response did not include a client_id. Cannot build OIDC client for issuer.'
+                );
+            }
 
             $clientMetadataFile = $this->getClientMetaDataFilePath($issuer);
             $fileContents = json_encode($registeredClaims,
