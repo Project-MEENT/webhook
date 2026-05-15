@@ -282,9 +282,7 @@ class SolidClient
 
     }
 
-    final public function storeResource($webIdUrl, $resourceUrl, $resource = null)
-        // If there is no "offline" access, this only works after we have been redirected from the Issuer
-        // @FIXME: Do we need POST or PUT? Do we expect to only create new resources for each call? Or append them to an existing resource?
+    final public function storeResource($webIdUrl, $resourceUrl, $resource = null, $contentType = null)
     {
         if (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
             throw SolidException::create("Provided WebID '$webIdUrl' is not a valid URL");
@@ -294,7 +292,7 @@ class SolidClient
             throw SolidException::create("Provided resource URL '$resourceUrl' is not a valid URL");
         }
 
-        $putRequest = $this->createResourceRequest('PUT', $webIdUrl, $resourceUrl, $resource, 'text/turtle');
+        $putRequest = $this->createResourceRequest('PUT', $webIdUrl, $resourceUrl, $resource, $contentType);
 
         try {
             return $this->httpClient->send($putRequest);
