@@ -467,9 +467,6 @@ class ApiController extends AbstractController
             $response['title'] = 'No data received';
             $response['type'] = '/errors/';
         } else {
-            // Data is written as-is
-            $data = $input;
-
             // Check which Solid Pod to write to
             if (isset($apiKey)) {
                 $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
@@ -479,17 +476,21 @@ class ApiController extends AbstractController
 
             // Write data to Solid Pod (@TODO: Decide on path / resource container)
             $message = 'Records written';
+
             if ($version >= 0.2) {
+                $dateTime = new \DateTimeImmutable('now');
+                $dateTime->setTimezone(new \DateTimeZone('Europe/Amsterdam'));
+                $timestamp = $dateTime->format('Ymd.His');
+
                 $id = rtrim(strtr(base64_encode(random_bytes(12)), '+/', '-_'), '=');
                 if ($version >= 0.3) {
                     // When data is received, it is stored in `/{webid-hash}/{timestamp}.{id}.data`
                     $filePath = vsprintf("%s/%s.%s.data", [
                         'webIdHash' => $this->hashUrl($webId, 'sha1'),
-                        'timestamp' => date('Ymd.His'),
+                        'timestamp' => $timestamp,
                         $id,
                     ]);
                 } else {
-                    $timestamp = date('Ymd/His');
                     $filePath = "$timestamp.$id.data";
                 }
 
@@ -498,17 +499,23 @@ class ApiController extends AbstractController
                 if ($version >= 0.3) {
                     $url = $this->getBaseUrl($request) . '/api/data/' . $filePath;
                     $data = null;
+                    $statuscode = 201;
+
                     // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
                     $response['headers']['Location'] = [$url];
                 } else {
+                    $data = $input;
                     $message .= ' to ' . $filePath;
                 }
+            } else {
+                $data = $input;
+                $statuscode = 201;
             }
 
             // Return success
             /* @TODO: Add link to URL on Solid Pod . '' */
             $response['content'] = $data;
-            $response['status'] = 201;
+            $response['status'] = $statuscode;
             $response['title'] = $message;
         }
 
