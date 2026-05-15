@@ -11,7 +11,7 @@ document.querySelectorAll('form').forEach(form => {
         output.textContent = ''
 
         form.style.display = 'none'
-        form.insertAdjacentHTML('afterend', '<a data-js="response-link" href="/">\u2190 Try again</a>')
+        form.insertAdjacentHTML('afterend', '<a data-js="response-link" href="">\u2190 Try again</a>')
 
         const isRegisterRequest = form.dataset.js === 'register-form'
         const data = isRegisterRequest
