@@ -1,0 +1,78 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix link: <https://www.w3.org/ns/iana/link-relations/relation#> .
+@prefix meent: <#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix vann: <https://vocab.org/vann/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+meent:
+    a owl:Ontology ;
+    dcterms:created "2026-05-10"^^xsd:date ;
+    dcterms:description "Ad-hoc ontology that mirrors the actual P1 data currently sent to MEENT. It is a straightforward JSON to Turtle conversion."@en ;
+    dcterms:title "MEENT P1 capture ontology"@en ;
+    link:canonical <http://purl.org/meent/p1>;
+    rdfs:comment "This ontology is meant as a first starting point from the raw payload data."@en ;
+    vann:preferredNamespacePrefix "ldpl" ;
+    vann:preferredNamespaceUri "https://purl.org/pdsinterop/link-metadata#"^^xsd:anyURI .
+
+meent:Record
+    a owl:Class ;
+    rdfs:comment "One timestamped P1 data record in the raw ad-hoc representation."@en ;
+    rdfs:label "P1 record"@en .
+
+meent:id
+    a owl:DatatypeProperty ;
+    rdfs:comment "Primary identifier for the dongle."@en ;
+    rdfs:domain meent:Record ;
+    rdfs:label "id"@en ;
+    rdfs:range xsd:string .
+
+meent:active_power_w
+    a owl:DatatypeProperty ;
+    rdfs:comment "Active electrical power in watts."@en ;
+    rdfs:domain meent:Record ;
+    rdfs:label "active_power_w"@en ;
+    rdfs:range xsd:decimal .
+
+meent:p_from_grid
+    a owl:DatatypeProperty ;
+    rdfs:comment "Electrical power imported from the grid in watts."@en ;
+    rdfs:domain meent:Record ;
+    rdfs:label "p_from_grid"@en ;
+    rdfs:range xsd:decimal .
+
+meent:p_to_grid
+    a owl:DatatypeProperty ;
+    rdfs:comment "Electrical power exported to the grid in watts."@en ;
+    rdfs:domain meent:Record ;
+    rdfs:label "p_to_grid"@en ;
+    rdfs:range xsd:decimal .
+
+meent:serial
+    a owl:DatatypeProperty ;
+    rdfs:comment "Serial provided by the dongle."@en ;
+    rdfs:domain meent:Record ;
+    rdfs:label "serial"@en ;
+    rdfs:range xsd:string .
+
+meent:timestamp
+    a owl:DatatypeProperty ;
+    rdfs:comment "Canonical timestamp of the Record"@en ;
+    rdfs:domain meent:Record ;
+    rdfs:label "timestamp"@en ;
+    rdfs:range xsd:dateTime .
+
+meent:total_power_export_kwh
+    a owl:DatatypeProperty ;
+    rdfs:comment "Cumulative electrical power exported to the grid in kilowatt-hour."@en ;
+    rdfs:domain meent:Record ;
+    rdfs:label "total_power_export_kwh"@en ;
+    rdfs:range xsd:decimal .
+
+meent:total_power_import_kwh
+    a owl:DatatypeProperty ;
+    rdfs:comment "Cumulative electrical power imported from the grid in kilowatt-hour."@en ;
+    rdfs:domain meent:Record ;
+    rdfs:label "total_power_import_kwh"@en ;
+    rdfs:range xsd:decimal .
