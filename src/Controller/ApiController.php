@@ -347,10 +347,67 @@ class ApiController extends AbstractController
 
             if ($authError !== []) {
                 return $authError;
+            } elseif ($version >= 0.4) {
+                $auth = $request->getHeaderLine('Authorization');
+                $apiKey = substr($auth, 7);
             }
         }
 
         $filePath = $this->getRequestedObject($request);
+
+        if (isset($apiKey)) {
+            $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
+
+            $solidClientFactory = new SolidClientFactory();
+            $solidClient = $solidClientFactory->create($request);
+
+            $storageUrls = $solidClient->fetchStorageUrls($webId);
+
+            if ($storageUrls !== []) {
+                // @TODO: Instead of using the first URL, the user should be asked which one to use when registering
+                $storageUrlRoot = reset($storageUrls);
+                $storageUrl = rtrim($storageUrlRoot, '/');
+            }
+
+            if (empty($storageUrl)) {
+                $response['content'] = [[
+                    'detail' => 'No Storage URL found for the WebID, cannot read data from Solid Pod',
+                    'pointer' => '#no-storage-url',
+                ]];
+                $response['status'] = 422;
+                $response['title'] = 'No Storage URL';
+                $response['type'] = '/errors/';
+
+                return $response;
+            }
+
+            $resourceUrl = vsprintf('%s/%s', [
+                'root' => $storageUrl,
+                'path' => $filePath,
+            ]);
+
+            try {
+                $solidResponse = $solidClient->fetchResource($webId, $resourceUrl);
+            } catch (SolidException $e) {
+                $response['content'] = [[
+                    'detail' => 'Error fetching resource from Solid Pod: ' . $e->getMessage(),
+                    'pointer' => '#solid-fetch-error',
+                ]];
+                $response['status'] = 502;
+                $response['title'] = 'Error fetching resource from Solid Pod';
+                $response['type'] = '/errors/';
+
+                return $response;
+            }
+
+            $resource = $solidResponse->getBody()->getContents();
+            $response['content'] = $resource;
+            $response['status'] = 200;
+            $response['headers']['Content-Type'] = [$solidResponse->getHeaderLine('Content-Type')];
+
+
+            return $response;
+        }
 
         $isInvalidPath = strpos($filePath, '/') === false || ! str_ends_with($filePath, '.data');
         if ($isInvalidPath) {
