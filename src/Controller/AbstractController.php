@@ -8,6 +8,14 @@ use Psr\Http\Message\RequestInterface;
 abstract class AbstractController
 {
     protected const SUBJECT_ROOT = '__ROOT__';
+    protected const EMPTY_CONTENT = [
+        'footer' => '',
+        'header' => '',
+        'main' => '',
+        'script' => '',
+        'style' => '',
+        'title' => '',
+    ];
 
     abstract public function handleRequest(RequestInterface $request, array $response);
 

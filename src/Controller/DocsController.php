@@ -30,39 +30,49 @@ class DocsController extends AbstractController
 
         switch ($subject) {
             case self::SUBJECT_ROOT:
-                $content = file_get_contents(__DIR__ . '/../../README.md');
+                $fileContent = file_get_contents(__DIR__ . '/../../README.md');
+                $markdown = $this->parseMarkdown($fileContent, $response);
 
                 if (str_contains($acceptHeader, 'application/json')) {
-                    $response['content'] = $content;
-                    $response['title'] = 'MEENT Webhook Documentation';
+                    $response['content'] = $fileContent;
+                    $response['title'] = $markdown['title'];
                 } else {
-                    $readmeContent = $this->parseReadme($content, $response);
+                    $content = [
+                        'header' => $converter->convert($markdown['description']),
+                        'main' => '<section>' . $converter->convert($markdown['content']) . '</section>',
+                        'title' => $markdown['title'],
+                    ];
 
+                    $content = array_merge(self::EMPTY_CONTENT, $content);
                     $template = $this->getContents('template');
-
-                    $response['content'] = vsprintf($template, [
-                        'footer' => '',
-                        'header' => $converter->convert($readmeContent['description']),
-                        'main' => '<section>' . $converter->convert($readmeContent['content']) . '</section>',
-                        'script' => '',
-                        'style' => <<<CSS
-                            title { display: inline; }
-                            h2 { width: 100%; }
-CSS
-,
-                        'title' => $readmeContent['title'],
-                    ]);
+                    $response['content'] = vsprintf($template, $content);
 
                     $response['title'] = '';
                 }
                 break;
 
             case self::SUBJECT_CONTENT:
+                $fileContent = file_get_contents(__DIR__ . '/../../docs/usage.md');
+                $markdown = $this->parseMarkdown($fileContent, $response);
+
                 if (str_contains($acceptHeader, 'application/json')) {
-                    $response['title'] = 'MEENT Webhook';
+                    $response['content'] = [
+                        'markdown' => $fileContent,
+                        'html' => $converter->convert($fileContent)->getContent(),
+                    ];
+                    $response['title'] = $markdown['title'];
                 } else {
-                    $contents = $this->getContents('index');
-                    $response['content'] = $contents;
+                    $content = [
+                        'header' => $converter->convert($markdown['description']),
+                        'main' => '<section>' . $converter->convert($markdown['content']) . '</section>',
+                        'title' => $markdown['title'],
+                    ];
+
+                    $content = array_merge(self::EMPTY_CONTENT, $content);
+                    $template = $this->getContents('template');
+                    $response['content'] = vsprintf($template, $content);
+
+                    $response['title'] = '';
                 }
             break;
 
@@ -83,7 +93,7 @@ CSS
         return $response;
     }
 
-    private function parseReadme($markdown, $response)
+    private function parseMarkdown($markdown, $response)
     {
         $response['content'] = '';
         $response['description'] = '';

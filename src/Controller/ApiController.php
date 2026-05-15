@@ -26,15 +26,6 @@ class ApiController extends AbstractController
         'v0.4', // Provide consent
     ];
 
-    private const EMPTY_CONTENT = [
-        'footer' => '',
-        'header' => '',
-        'main' => '',
-        'script' => '',
-        'style' => '',
-        'title' => '',
-    ];
-
     private const SUBJECT_CONSENT = 'consent';
     private const SUBJECT_DATA = 'data';
     private const SUBJECT_REGISTER = 'register';
