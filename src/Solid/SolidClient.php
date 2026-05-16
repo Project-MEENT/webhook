@@ -14,7 +14,7 @@ use Facile\OpenIDClient\Service\AuthorizationService;
 use Facile\OpenIDClient\Service\RegistrationService;
 use Facile\OpenIDClient\Token\IdTokenVerifierBuilder;
 use Facile\OpenIDClient\Token\TokenSetInterface;
-use GuzzleHttp\Client;
+use GuzzleHttp\Client as HttpClient;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Exception\SolidException;
 use Meent\WebHook\UrlHashTrait;
@@ -25,7 +25,7 @@ class SolidClient
     use UrlHashTrait;
 
     private AuthorizationService $authorizationService;
-    private Client $httpClient;
+    private HttpClient $httpClient;
     private ClientBuilder $oidcClientBuilder;
     private DpopProofFactory $dpopProofFactory;
     private FilesystemOperator $filesystem;
@@ -39,22 +39,27 @@ class SolidClient
     final public function __construct(
         SolidClientConfig $config,
         OidcClientConfig $oidcConfig,
-        array $dependencies,
+        AuthorizationService $authorizationService,
+        ClientBuilder $oidcClientBuilder,
+        DpopProofFactory $dpopProofFactory,
+        FilesystemOperator $filesystem,
+        Graph $graph,
+        HttpClient $httpClient,
+        IdTokenVerifierBuilder $idTokenVerifierBuilder,
+        IssuerBuilder $issuerBuilder,
+        RegistrationService $registration,
     ) {
-        // @FIXME: Replace injected Dependency array with individual classes and/or factories
-
+        $this->authorizationService = $authorizationService;
         $this->config = $config;
+        $this->dpopProofFactory = $dpopProofFactory;
+        $this->filesystem = $filesystem;
+        $this->graph = $graph;
+        $this->httpClient = $httpClient;
+        $this->idTokenVerifierBuilder = $idTokenVerifierBuilder;
+        $this->issuerBuilder = $issuerBuilder;
+        $this->oidcClientBuilder = $oidcClientBuilder;
         $this->oidcConfig = $oidcConfig;
-
-        $this->authorizationService = $dependencies['authorizationService'];
-        $this->dpopProofFactory = $dependencies['dpopProofFactory'];
-        $this->filesystem = $dependencies['filesystem'];
-        $this->graph = $dependencies['graph'];
-        $this->httpClient = $dependencies['httpClient'];
-        $this->idTokenVerifierBuilder = $dependencies['idTokenVerifierBuilder'];
-        $this->issuerBuilder = $dependencies['issuerBuilder'];
-        $this->oidcClientBuilder = $dependencies['oidcClientBuilder'];
-        $this->registration = $dependencies['registration'];
+        $this->registration = $registration;
 
         if (! RdfNamespace::get('solid')) {
             RdfNamespace::set('solid', 'http://www.w3.org/ns/solid/terms#');
@@ -103,8 +108,6 @@ class SolidClient
 
         return $storageUrls;
     }
-
-    // @FIXME: There is a scenario where, if the page is opened with a WebID, and there has not yet been a consent call, we will get a 403!
 
     final public function connectWebId($webIdUrl, Session $session)
     {

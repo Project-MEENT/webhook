@@ -64,14 +64,28 @@ class SolidClientFactory
         $useOffline = true;
         $usePkce = true;
 
-        $dependencies = $this->createDependencies($httpClientConfig, $storageLocation, $metadataCacheTtlSeconds, $dpopJwkFile);
+        $filesystem = $this->createFilesystem($storageLocation);
 
         $oidcClientConfig = $this->createClientConfig(
-            $dependencies['filesystem'],
+            $filesystem,
             $clientConfigFile,
             $clientName,
             $clientRedirectUri,
         );
+
+        $cache = $this->createCache($filesystem);
+
+        $httpClient = new HttpClient($httpClientConfig);
+
+        $issuerBuilder = $this->createIssuerBuilder($httpClient, $cache, $metadataCacheTtlSeconds);
+        $dpopProofFactory = $this->createDpopProofFactory($filesystem, $dpopJwkFile);
+        $dpopAuthMethodFactory = $this->createDpopAuthMethodFactory($dpopProofFactory);
+        $oidcClientBuilder = $this->createOidcClientBuilder($dpopAuthMethodFactory, $httpClient);
+
+        $registrationServiceBuilder = new RegistrationServiceBuilder();
+        $registration = $registrationServiceBuilder->build();
+
+        $authorizationService = $this->createAuthorizationServiceBuild($httpClient);
 
         $solidClientConfig = new SolidClientConfig(
             // For certain issuers (like https://solidcommunity.net) PKCE is required, even for server-to-server calls.
@@ -87,7 +101,15 @@ class SolidClientFactory
         return new SolidClient(
             $solidClientConfig,
             $oidcClientConfig,
-            $dependencies,
+            $authorizationService,
+            $oidcClientBuilder,
+            $dpopProofFactory,
+            $filesystem,
+            new Graph(),
+            $httpClient,
+            new IdTokenVerifierBuilder(),
+            $issuerBuilder,
+            $registration,
         );
     }
 
@@ -129,43 +151,6 @@ class SolidClientFactory
             redirectUris: $clientRedirectUris,
             clientId: is_string($clientId) ? $clientId : null,
         );
-    }
-
-    private function createDependencies($httpClientConfig, $storageLocation, $metadataCacheTtlSeconds, $dpopJwkFile)
-    {
-        // -----------------------------------------------------------------------------
-        $httpClient = new HttpClient($httpClientConfig);
-        $filesystem = $this->createFileSystem($storageLocation);
-
-        $cache = $this->createCache($filesystem);
-
-        // -----------------------------------------------------------------------------
-        $issuerBuilder = $this->createIssuerBuilder($httpClient, $cache, $metadataCacheTtlSeconds);
-        $dpopProofFactory = $this->createDpopProofFactory($filesystem, $dpopJwkFile);
-        $dpopAuthMethodFactory = $this->createDpopAuthMethodFactory($dpopProofFactory);
-        $oidcClientBuilder = $this->createOidcClientBuilder($dpopAuthMethodFactory, $httpClient);
-
-        // ---------------------------------------------------------------------
-        $registrationServiceBuilder = new RegistrationServiceBuilder();
-        $registration = $registrationServiceBuilder->build();
-
-        // ---------------------------------------------------------------------
-        $authorizationService = $this->createAuthorizationServiceBuild($httpClient);
-
-        // ---------------------------------------------------------------------
-        $graph = new Graph();
-
-        return [
-            'authorizationService' => $authorizationService,
-            'dpopProofFactory' => $dpopProofFactory,
-            'filesystem' => $filesystem,
-            'graph' => $graph,
-            'httpClient' => $httpClient,
-            'idTokenVerifierBuilder' => new IdTokenVerifierBuilder(),
-            'issuerBuilder' => $issuerBuilder,
-            'oidcClientBuilder' => $oidcClientBuilder,
-            'registration' => $registration,
-        ];
     }
 
     private function createAuthorizationServiceBuild(HttpClient $httpClient): AuthorizationService
@@ -241,22 +226,22 @@ class SolidClientFactory
         ?SimpleCache $cache,
         int $metadataCacheTtlSeconds
     ): IssuerBuilder {
-        $metadataProviderBuilder = new MetadataProviderBuilder();
         $issuerBuilder = new IssuerBuilder();
+        $jwksProviderBuilder = new JwksProviderBuilder();
+        $metadataProviderBuilder = new MetadataProviderBuilder();
 
         $metadataProviderBuilder->setHttpClient($httpClient);
         $issuerBuilder = $issuerBuilder->setMetadataProviderBuilder($metadataProviderBuilder);
 
         if ($cache instanceof CacheInterface) {
             $metadataProviderBuilder->setCache($cache)->setCacheTtl($metadataCacheTtlSeconds);
-
-            $jwksProviderBuilder = new JwksProviderBuilder();
-            $jwksProviderBuilder
-                // Do not cache JWKS in this PoC:
-                // the local dev OP can rotate keys between runs, which causes false
-                // "Invalid token signature" failures when stale JWK sets are reused.
-                // ->withCache($cache)->withCacheTtl(86400)// Cache JWKS for 1 day
-                ->build();
+            // Do not cache JWKS in this PoC:
+            // the local dev OP can rotate keys between runs, which causes false
+            // "Invalid token signature" failures when stale JWK sets are reused.
+            // $jwksProviderBuilder = $jwksProviderBuilder
+            //     ->withCache($cache)
+            //     ->withCacheTtl(86400)// Cache JWKS for 1 day
+            // ;
 
             $issuerBuilder->setJwksProviderBuilder($jwksProviderBuilder);
         }
