@@ -34,10 +34,12 @@ class ApiController extends AbstractController
     private const SUBJECT_REGISTER = 'register';
 
     private FilesystemOperator $filesystem;
+    private SolidClientFactory $solidClientFactory;
 
-    final public function __construct(FilesystemOperator $filesystem)
+    final public function __construct(FilesystemOperator $filesystem, SolidClientFactory $solidClientFactory)
     {
         $this->filesystem = $filesystem;
+        $this->solidClientFactory = $solidClientFactory;
     }
 
     final public function handleRequest(RequestInterface $request, array $response)
@@ -224,8 +226,7 @@ class ApiController extends AbstractController
                     ?? $queryParams['connected']
                     ?? null;
 
-                $solidClientFactory = new SolidClientFactory();
-                $solidClient = $solidClientFactory->create($request);
+                $solidClient = $this->solidClientFactory->create($request);
 
                 if (isset($queryParams['error'])) {
                     $response['content'] = [[
@@ -361,8 +362,7 @@ class ApiController extends AbstractController
         if (isset($apiKey)) {
             $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
 
-            $solidClientFactory = new SolidClientFactory();
-            $solidClient = $solidClientFactory->create($request);
+            $solidClient = $this->solidClientFactory->create($request);
 
             $storageUrls = $solidClient->fetchStorageUrls($webId);
 
@@ -544,8 +544,7 @@ class ApiController extends AbstractController
                         $dateTime->setTimezone(new \DateTimeZone('Europe/Amsterdam'));
                         $timestamp = $dateTime->format('Ymd.His');
 
-                        $solidClientFactory = new SolidClientFactory();
-                        $solidClient = $solidClientFactory->create($request);
+                        $solidClient = $this->solidClientFactory->create($request);
 
                         // @FIXME: Read StorageUrl from persistent configuration instead of resolving it on every request.
                         if (empty($storageUrl)) {
@@ -695,8 +694,7 @@ class ApiController extends AbstractController
 
                 $isConnected = true;
                 if ($version >= 0.4) {
-                    $solidClientFactory = new SolidClientFactory();
-                    $solidClient = $solidClientFactory->create($request);
+                    $solidClient = $this->solidClientFactory->create($request);
                     $isConnected = $solidClient->isWebIdConnected($webId);
 
                     if (! $isConnected) {

@@ -6,6 +6,7 @@ use Laminas\Diactoros\ServerRequestFactory;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\Local\LocalFilesystemAdapter;
+use Meent\WebHook\Solid\SolidClientFactory;
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -72,7 +73,8 @@ switch ($accept[0]) {
 
 switch ($rootPath) {
     case 'api':
-        $controller = new \Meent\WebHook\Controller\ApiController($filesystem);
+        $solidClientFactory = new SolidClientFactory();
+        $controller = new \Meent\WebHook\Controller\ApiController($filesystem, $solidClientFactory);
         try {
             $response = $controller->handleRequest($request, $response);
         } catch (FilesystemException $exception) {
