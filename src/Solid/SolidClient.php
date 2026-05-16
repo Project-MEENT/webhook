@@ -24,8 +24,6 @@ class SolidClient
 {
     use UrlHashTrait;
 
-    private array $config;
-
     private AuthorizationService $authorizationService;
     private Client $httpClient;
     private ClientBuilder $oidcClientBuilder;
@@ -34,14 +32,19 @@ class SolidClient
     private Graph $graph;
     private IdTokenVerifierBuilder $idTokenVerifierBuilder;
     private IssuerBuilder $issuerBuilder;
+    private OidcClientConfig $oidcConfig;
     private RegistrationService $registration;
+    private SolidClientConfig $config;
 
-    final public function __construct(array $config, array $dependencies)
-    {
-        // @FIXME: Replace injected Config array with class
+    final public function __construct(
+        SolidClientConfig $config,
+        OidcClientConfig $oidcConfig,
+        array $dependencies,
+    ) {
         // @FIXME: Replace injected Dependency array with individual classes and/or factories
 
         $this->config = $config;
+        $this->oidcConfig = $oidcConfig;
 
         $this->authorizationService = $dependencies['authorizationService'];
         $this->dpopProofFactory = $dependencies['dpopProofFactory'];
@@ -120,7 +123,7 @@ class SolidClient
         $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
         // On first connect, there is no grant, so skip directly to interactive auth flow.
-        if ($this->config['useOfflineAccess'] === true && ! $this->filesystem->fileExists($offlineGrantFile)) {
+        if ($this->config->useOffline() === true && ! $this->filesystem->fileExists($offlineGrantFile)) {
             try {
                 $accessToken = $this->handleOfflineAccess($oidcClient, $issuer, $webIdUrl);
 
@@ -168,7 +171,7 @@ class SolidClient
         // In callback mode, issuer is recovered exclusively from signed state.
 
         // CSRF: validate state matches what we sent (OIDC Core Section 3.1.2.7).
-        if ($this->config['useCsrfCheck'] === true) {
+        if ($this->config->useCsrf() === true) {
             $expectedState = $session->get('oauth_state');
 
             if ($state !== $expectedState) {
@@ -198,7 +201,7 @@ class SolidClient
         // The token request must include a DPoP header with a valid proof JWT (see RFC9449 Section 4.2 for proof syntax).
 
         $codeVerifier = null;
-        if ($this->config['usePkce'] === true) {
+        if ($this->config->usePkce() === true) {
             /*/ rfc7636 - PKCE - Section 4.5.  Client Sends the Authorization Code and the Code Verifier to the Token Endpoint /*/
             $codeVerifier = $session->get('pkce_code_verifier');
             $hasValidCodeVerifier = is_string($codeVerifier) && $codeVerifier !== '';
@@ -229,7 +232,7 @@ class SolidClient
         // -------------------------------------------------------------------------
         // Persist tokens for offline operation — written directly to the grant file,
         // Store refresh_token server-side; never expose to browser (OIDC Core Section 12).
-        if ($this->config['useOfflineAccess'] === true) {
+        if ($this->config->useOffline() === true) {
             $refreshToken = $tokenSet->getRefreshToken();
             if (! is_string($refreshToken) || $refreshToken === '') {
                 throw SolidException::create(
@@ -499,34 +502,30 @@ class SolidClient
 
     private function getClientConfig()
     {
-        $clientConfigFile = $this->config['client']['ConfigFile'];
-        $clientId = $this->config['client']['Id'];
-        $clientName = $this->config['client']['Name'];
-        $clientRedirectUris = $this->config['client']['RedirectUris'];
-        $clientSecret = $this->config['client']['Secret'];
-
         $filesystem = $this->filesystem;
 
-        if (! $filesystem->fileExists($clientConfigFile)) {
+        // @FIXME: The Oidc Client config file should be created before SolidClient instantiation
+        if (! $filesystem->fileExists($this->oidcConfig->configFile())) {
             // Client metadata file not found, creating...
             $data = [
-                'client_name' => $clientName,
-                'client_secret' => $clientSecret,
-                'redirect_uris' => $clientRedirectUris,
+                'client_name' => $this->oidcConfig->clientName(),
+                'client_secret' => $this->oidcConfig->clientSecret(),
+                'redirect_uris' => $this->oidcConfig->redirectUris(),
                 'token_endpoint_auth_method' => 'client_secret_basic', // the auth method for the token endpoint
             ];
 
+            $clientId = $this->oidcConfig->clientId();
             if (is_string($clientId) && $clientId !== '') {
                 $data['client_id'] = $clientId;
             }
 
-            if ($this->config['useOfflineAccess'] === true) {
+            if ($this->config->useOffline() === true) {
                 // grant_types must include refresh_token to receive one (OIDC Core Section 11 / offline_access)
                 $data['grant_types'] = ['authorization_code', 'refresh_token'];
                 $data['scope'] = 'openid webid offline_access';
             }
 
-            $filesystem->write($clientConfigFile, json_encode($data,
+            $filesystem->write($this->oidcConfig->configFile(), json_encode($data,
                 JSON_PRETTY_PRINT
                 | JSON_THROW_ON_ERROR
                 | JSON_UNESCAPED_SLASHES // Don't escape slashes `/`.
@@ -534,7 +533,7 @@ class SolidClient
         }
 
         // Reading oidcClient metadata from file
-        $json = $filesystem->read($clientConfigFile);
+        $json = $filesystem->read($this->oidcConfig->configFile());
 
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
@@ -552,7 +551,7 @@ class SolidClient
         $header = Utility::base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'],
             JSON_THROW_ON_ERROR));
         $payload = Utility::base64UrlEncode(json_encode([
-            'exp' => time() + $this->config['state']['TtlSeconds'],
+            'exp' => time() + $this->config->expirationTime(),
             'issr' => $issuerUrl,
         ], JSON_THROW_ON_ERROR));
 
@@ -569,7 +568,7 @@ class SolidClient
 
         $authorizationRequestParams['state'] = $state;
 
-        if ($this->config['usePkce'] === true) {
+        if ($this->config->usePkce() === true) {
             /*/ rfc7636 - PKCE - Section 4.1.  Client Creates a Code Verifier /*/
             // 32 random bytes base64url-encoded → 43-char verifier in the allowed unreserved set.
             $codeVerifier = Utility::base64UrlEncode(random_bytes(32));
@@ -584,7 +583,7 @@ class SolidClient
             $authorizationRequestParams['code_challenge_method'] = 'S256'; // RFC7636: clients capable of S256 MUST use S256.
         }
 
-        if ($this->config['useOfflineAccess'] === true) {
+        if ($this->config->useOffline() === true) {
             // offline_access requires explicit consent so the OP actually issues a refresh token (OIDC Core Section 11).
             $grant = $this->getOfflineGrant($issuer, $webIdUrl);
             if (empty($grant['solid_refresh_token'])) {
@@ -607,7 +606,7 @@ class SolidClient
             $header = json_decode(Utility::base64UrlDecode($parts[0]), true, 512, JSON_THROW_ON_ERROR);
             $payload = json_decode(Utility::base64UrlDecode($parts[1]), true, 512, JSON_THROW_ON_ERROR);
 
-            $expectedSignature = Utility::createSignature($parts[0] . '.' . $parts[1], $this->config['state']['SigningKey']);
+            $expectedSignature = Utility::createSignature($parts[0] . '.' . $parts[1], $this->config->stateSigningKey());
 
             if (! is_array($header) || ($header['alg'] ?? null) !== 'HS256') {
                 $error = 'State JWT must use HS256';
@@ -641,10 +640,10 @@ class SolidClient
         $params = [
             'code' => $authorizationCode,
             'grant_type' => 'authorization_code',
-            'redirect_uri' => $this->config['client']['RedirectUri'],
+            'redirect_uri' => $this->oidcConfig->redirectUri(),
         ];
 
-        if ($this->config['usePkce'] === true && is_string($codeVerifier) && $codeVerifier !== '') {
+        if ($this->config->usePkce() === true && is_string($codeVerifier) && $codeVerifier !== '') {
             $params['code_verifier'] = $codeVerifier;
         }
 

@@ -47,20 +47,52 @@ class SolidClientFactory
             // 'verify_peer' => false,
         ];
 
-        $storageLocation = __DIR__ . '/../../build/storage/';
-        $dependencies = $this->createDependencies($httpClientConfig, $storageLocation);
+        $clientConfigFile = 'client_metadata.json';
+        $clientName = 'MEENT Solid P1 Dongle Webhook';
+        $clientRedirectUri = $this->clientRedirectUri;
+        $dpopJwkFile = 'dpop_jwk.json';
+        $metadataCacheTtlSeconds = 86400 * 30; // Cache metadata for 30 days
+        $storageLocation = __DIR__ . '/../../build/storage';
+        $ttlSeconds = 300;
+        $useCsrf = true;
+        $useOffline = true;
+        $usePkce = true;
 
-        $config = $this->createConfig($request, $dependencies['filesystem']);
+        $dependencies = $this->createDependencies($httpClientConfig, $storageLocation, $metadataCacheTtlSeconds, $dpopJwkFile);
 
-        return new SolidClient($config, $dependencies);
+        $oidcClientConfig = $this->createClientConfig(
+            $dependencies['filesystem'],
+            $clientConfigFile,
+            $clientName,
+            $clientRedirectUri,
+        );
+
+        $solidClientConfig = new SolidClientConfig(
+            // For certain issuers (like https://solidcommunity.net) PKCE is required, even for server-to-server calls.
+            // @FIXME: PKCE use should be stored in the server offline grant or metadata JSON.
+            useCsrf: $useCsrf,
+            useOffline: $useOffline,
+            usePkce: $usePkce,
+            expirationTime: $ttlSeconds,
+            // @FIXME: Use separate secret (i.e. private key) for signing, so it can be rotated.
+            stateSigningKey: $oidcClientConfig->clientSecret(),
+        );
+
+        return new SolidClient(
+            $solidClientConfig,
+            $oidcClientConfig,
+            $dependencies,
+        );
     }
 
-    final public function createConfig(RequestInterface $request, FilesystemOperator $filesystem): array
-    {
-        // -----------------------------------------------------------------------------
-        $clientConfigFile = 'client_metadata.json';
-
+    final public function createClientConfig(
+        FilesystemOperator $filesystem,
+        $clientConfigFile,
+        string $defaultClientName,
+        string $clientRedirectUri,
+    ): OidcClientConfig {
         $clientConfig = [];
+
         if ($filesystem->fileExists($clientConfigFile)) {
             try {
                 $contents = json_decode($filesystem->read($clientConfigFile), true, 512, JSON_THROW_ON_ERROR);
@@ -74,52 +106,26 @@ class SolidClientFactory
 
         // Keep client_id only when explicitly configured (static registration or Client URI "${clientServer}/${clientConfigFile}")
         $clientId = $clientConfig['client_id'] ?? null;
-        $clientName = $clientConfig['client_name'] ?? 'MEENT Solid P1 Dongle Webhook';
+        $clientName = $clientConfig['client_name'] ?? $defaultClientName;
         if (isset($clientConfig['redirect_uris'])) {
             $clientRedirectUris = $clientConfig['redirect_uris'];
             $clientRedirectUri = reset($clientRedirectUris);
         } else {
-            $clientRedirectUri = $this->clientRedirectUri;
-            $clientRedirectUris = [ $clientRedirectUri ];
+            $clientRedirectUris = [$clientRedirectUri];
         }
         $clientSecret = $clientConfig['client_secret'] ?? Utility::base64UrlEncode(random_bytes(32));
 
-        // -----------------------------------------------------------------------------
-        $stateSigningKey = $clientSecret; // @FIXME: Use separate secret (i.e. private key) for signing, so it can be rotated
-        $stateTtlSeconds = 300;
-
-        // -----------------------------------------------------------------------------
-        // For certain issuers (like https://solidcommunity.net) PKCE is required, even for  server-to-server calls
-        // @FIXME: PKCE use should be stored in the server offline grant or metadata JSON
-        $usePkce = true;
-
-        // -----------------------------------------------------------------------------
-        $useCsrfCheck = true;
-
-        // -----------------------------------------------------------------------------
-        $useOfflineAccess = true;
-
-        // -----------------------------------------------------------------------------
-        return [
-            'client' => [
-                'ConfigFile' => $clientConfigFile,
-                'Id' => $clientId,
-                'Name' => $clientName,
-                'RedirectUri' => $clientRedirectUri,
-                'RedirectUris' => $clientRedirectUris,
-                'Secret' => $clientSecret,
-            ],
-            'state' => [
-                'SigningKey' => $stateSigningKey,
-                'TtlSeconds' => $stateTtlSeconds,
-            ],
-            'useCsrfCheck' => $useCsrfCheck,
-            'useOfflineAccess' => $useOfflineAccess,
-            'usePkce' => $usePkce,
-        ];
+        return new OidcClientConfig(
+            clientName: $clientName,
+            clientSecret: $clientSecret,
+            configFile: $clientConfigFile,
+            redirectUri: $clientRedirectUri,
+            redirectUris: $clientRedirectUris,
+            clientId: is_string($clientId) ? $clientId : null,
+        );
     }
 
-    private function createDependencies($httpClientConfig, $storageLocation)
+    private function createDependencies($httpClientConfig, $storageLocation, $metadataCacheTtlSeconds, $dpopJwkFile)
     {
 
         // -----------------------------------------------------------------------------
@@ -162,7 +168,7 @@ class SolidClientFactory
         $issuerBuilder = $issuerBuilder->setMetadataProviderBuilder($metadataProviderBuilder);
 
         if (isset($cache) && $cache instanceof CacheInterface) {
-            $metadataProviderBuilder->setCache($cache)->setCacheTtl(86400 * 30); // Cache metadata for 30 days
+            $metadataProviderBuilder->setCache($cache)->setCacheTtl($metadataCacheTtlSeconds);
 
             $jwksProviderBuilder = new JwksProviderBuilder();
             $jwksProviderBuilder
