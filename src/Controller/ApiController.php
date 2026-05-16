@@ -16,7 +16,7 @@ class ApiController extends AbstractController
 {
     use UrlHashTrait;
 
-    const AVAILABLE_SUBJECTS = [
+    private const AVAILABLE_SUBJECTS = [
         self::SUBJECT_CONSENT,
         self::SUBJECT_DATA,
         self::SUBJECT_REGISTER,

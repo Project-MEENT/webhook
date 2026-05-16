@@ -254,10 +254,10 @@ class SolidClient
             }
 
             $grant = array_filter([
-                'solid_access_token'   => $tokenSet->getAccessToken(),
-                'solid_refresh_token'  => $refreshToken,
-                'solid_token_expiry'   => $tokenExpiry,
-                'solid_webid'          => $webIdUrl,
+                'solid_access_token' => $tokenSet->getAccessToken(),
+                'solid_refresh_token' => $refreshToken,
+                'solid_token_expiry' => $tokenExpiry,
+                'solid_webid' => $webIdUrl,
             ], static function ($value) {
                 return $value !== null && $value !== '';
             });
@@ -388,10 +388,10 @@ class SolidClient
         // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
         $registeredClaims = $this->getRegisteredClaims($issuer);
 
-        if (empty($registeredClaims) || !isset($registeredClaims['client_id'])) {
+        if (empty($registeredClaims) || ! isset($registeredClaims['client_id'])) {
             $registeredClaims = $this->registerClaims($issuer);
 
-            if (!isset($registeredClaims['client_id'])) {
+            if (! isset($registeredClaims['client_id'])) {
                 throw SolidException::create(
                     'Dynamic registration response did not include a client_id. Cannot build OIDC client for issuer.'
                 );
@@ -541,8 +541,12 @@ class SolidClient
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 
-    private function getRedirectAuthorizationUri(OidcClientInterface $oidcClient, IssuerInterface $issuer, $webIdUrl, $session)
-    {
+    private function getRedirectAuthorizationUri(
+        OidcClientInterface $oidcClient,
+        IssuerInterface $issuer,
+        $webIdUrl,
+        $session,
+    ) {
         $issuerConfig = $issuer->getMetadata()->toArray();
         $issuerUrl = $issuerConfig['issuer'];
 
@@ -638,8 +642,11 @@ class SolidClient
         }
     }
 
-    private function getTokenSet(OidcClientInterface $oidcClient, $authorizationCode, ?string $codeVerifier = null): TokenSetInterface
-    {
+    private function getTokenSet(
+        OidcClientInterface $oidcClient,
+        $authorizationCode,
+        ?string $codeVerifier = null,
+    ): TokenSetInterface {
         $params = [
             'code' => $authorizationCode,
             'grant_type' => 'authorization_code',
@@ -741,7 +748,8 @@ class SolidClient
                 if ($this->filesystem->fileExists($offlineGrantFile)) {
                     $this->filesystem->delete($offlineGrantFile);
                 }
-                throw $e;
+
+                throw SolidException::create('Stored offline grant could not be refreshed. Reconnect WebID to renew consent.', $e);
             }
 
             $idToken = $tokenSet->getIdToken();
