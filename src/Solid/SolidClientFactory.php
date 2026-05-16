@@ -15,10 +15,11 @@ use Facile\OpenIDClient\AuthMethod\TLSClientAuth;
 use Facile\OpenIDClient\Client\ClientBuilder;
 use Facile\OpenIDClient\Issuer\IssuerBuilder;
 use Facile\OpenIDClient\Issuer\Metadata\Provider\MetadataProviderBuilder;
+use Facile\OpenIDClient\Service\AuthorizationService;
 use Facile\OpenIDClient\Service\Builder\AuthorizationServiceBuilder;
 use Facile\OpenIDClient\Service\Builder\RegistrationServiceBuilder;
 use Facile\OpenIDClient\Token\IdTokenVerifierBuilder;
-use GuzzleHttp\Client;
+use GuzzleHttp\Client as HttpClient;
 use Jose\Component\Core\AlgorithmManager;
 use Jose\Component\Core\JWK;
 use Jose\Component\KeyManagement\JWKFactory;
@@ -27,6 +28,11 @@ use Jose\Component\Signature\JWSBuilder;
 use Jose\Component\Signature\Serializer\CompactSerializer;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
+use League\Flysystem\InMemory\InMemoryFilesystemAdapter;
+use League\Flysystem\Local\LocalFilesystemAdapter;
+use MatthiasMullie\Scrapbook\Adapters\Flysystem;
+use MatthiasMullie\Scrapbook\Adapters\MemoryStore;
+use MatthiasMullie\Scrapbook\Psr16\SimpleCache;
 use Psr\SimpleCache\CacheInterface;
 
 class SolidClientFactory
@@ -127,47 +133,121 @@ class SolidClientFactory
 
     private function createDependencies($httpClientConfig, $storageLocation, $metadataCacheTtlSeconds, $dpopJwkFile)
     {
+        // -----------------------------------------------------------------------------
+        $httpClient = new HttpClient($httpClientConfig);
+        $filesystem = $this->createFileSystem($storageLocation);
+
+        $cache = $this->createCache($filesystem);
 
         // -----------------------------------------------------------------------------
-        $httpClient = new Client($httpClientConfig);
+        $issuerBuilder = $this->createIssuerBuilder($httpClient, $cache, $metadataCacheTtlSeconds);
+        $dpopProofFactory = $this->createDpopProofFactory($filesystem, $dpopJwkFile);
+        $dpopAuthMethodFactory = $this->createDpopAuthMethodFactory($dpopProofFactory);
+        $oidcClientBuilder = $this->createOidcClientBuilder($dpopAuthMethodFactory, $httpClient);
 
-        // -----------------------------------------------------------------------------
-        // Create FileSystem
-        // -----------------------------------------------------------------------------
-        if ($storageLocation) {
-            $adapter = new \League\Flysystem\Local\LocalFilesystemAdapter($storageLocation);
-        } else {
-            $adapter = new \League\Flysystem\InMemory\InMemoryFilesystemAdapter();
-        }
+        // ---------------------------------------------------------------------
+        $registrationServiceBuilder = new RegistrationServiceBuilder();
+        $registration = $registrationServiceBuilder->build();
 
-        $filesystem = new Filesystem($adapter);
+        // ---------------------------------------------------------------------
+        $authorizationService = $this->createAuthorizationServiceBuild($httpClient);
 
-        // -----------------------------------------------------------------------------
-        // Create Cache Store
-        // -----------------------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        $graph = new Graph();
+
+        return [
+            'authorizationService' => $authorizationService,
+            'dpopProofFactory' => $dpopProofFactory,
+            'filesystem' => $filesystem,
+            'graph' => $graph,
+            'httpClient' => $httpClient,
+            'idTokenVerifierBuilder' => new IdTokenVerifierBuilder(),
+            'issuerBuilder' => $issuerBuilder,
+            'oidcClientBuilder' => $oidcClientBuilder,
+            'registration' => $registration,
+        ];
+    }
+
+    private function createAuthorizationServiceBuild(HttpClient $httpClient): AuthorizationService
+    {
+        $authorizationServiceBuilder = new AuthorizationServiceBuilder();
+
+        return $authorizationServiceBuilder
+            ->setHttpClient($httpClient)
+            ->build();
+    }
+
+    private function createCache(Filesystem $filesystem): ?SimpleCache
+    {
         if ($filesystem && class_exists('\\MatthiasMullie\\Scrapbook\\Adapters\\Flysystem')) {
-            $store = new \MatthiasMullie\Scrapbook\Adapters\Flysystem($filesystem);
+            $store = new Flysystem($filesystem);
         } elseif (class_exists('\\MatthiasMullie\\Scrapbook\\Adapters\\MemoryStore')) {
-            $store = new \MatthiasMullie\Scrapbook\Adapters\MemoryStore();
+            $store = new MemoryStore();
         } else {
             $store = null;
         }
 
         if ($store) {
             // simple-cache implementation
-            $cache = new \MatthiasMullie\Scrapbook\Psr16\SimpleCache($store);
+            $cache = new SimpleCache($store);
+        } else {
+            $cache = null;
         }
 
-        // -----------------------------------------------------------------------------
-        // Create OIDC Client
-        // -----------------------------------------------------------------------------
+        return $cache;
+    }
+
+    private function createDpopAuthMethodFactory(DpopProofFactory $dpopProofFactory): AuthMethodFactory
+    {
+        /*/ RFC9449 - DPoP - Section 5: DPoP proof is injected automatically by DpopAuthMethod /*/
+        $methods = [
+            new DpopAuthMethod(new ClientSecretBasic(), $dpopProofFactory),
+            new DpopAuthMethod(new ClientSecretJwt(), $dpopProofFactory),
+            new DpopAuthMethod(new ClientSecretPost(), $dpopProofFactory),
+            new DpopAuthMethod(new None(), $dpopProofFactory),
+            new DpopAuthMethod(new PrivateKeyJwt(), $dpopProofFactory),
+            new DpopAuthMethod(new TLSClientAuth(), $dpopProofFactory),
+            new DpopAuthMethod(new SelfSignedTLSClientAuth(), $dpopProofFactory),
+        ];
+
+        // Initialise DPoP key pair (persisted to disk so the same key is reused across requests).
+        return new AuthMethodFactory($methods);
+    }
+
+    private function createDpopProofFactory(Filesystem $filesystem, string $dpopJwkFile): DpopProofFactory
+    {
+        $jwk = $this->createJwk($filesystem, $dpopJwkFile);
+
+        return new DpopProofFactory(
+            $jwk,
+            new JWSBuilder(new AlgorithmManager([new ES256()])),
+            new CompactSerializer()
+        );
+    }
+
+    private function createFileSystem($storageLocation): Filesystem
+    {
+        if ($storageLocation) {
+            $adapter = new LocalFilesystemAdapter($storageLocation);
+        } else {
+            $adapter = new InMemoryFilesystemAdapter();
+        }
+
+        return new Filesystem($adapter);
+    }
+
+    private function createIssuerBuilder(
+        HttpClient $httpClient,
+        ?SimpleCache $cache,
+        int $metadataCacheTtlSeconds
+    ): IssuerBuilder {
         $metadataProviderBuilder = new MetadataProviderBuilder();
         $issuerBuilder = new IssuerBuilder();
 
         $metadataProviderBuilder->setHttpClient($httpClient);
         $issuerBuilder = $issuerBuilder->setMetadataProviderBuilder($metadataProviderBuilder);
 
-        if (isset($cache) && $cache instanceof CacheInterface) {
+        if ($cache instanceof CacheInterface) {
             $metadataProviderBuilder->setCache($cache)->setCacheTtl($metadataCacheTtlSeconds);
 
             $jwksProviderBuilder = new JwksProviderBuilder();
@@ -181,6 +261,11 @@ class SolidClientFactory
             $issuerBuilder->setJwksProviderBuilder($jwksProviderBuilder);
         }
 
+        return $issuerBuilder;
+    }
+
+    private function createJwk(Filesystem $filesystem, string $dpopJwkFile): JWK
+    {
         // RFC9449 - DPoP - Section 5.  DPoP Access Token Request
         // Initialise DPoP key pair — persisted to disk so the same key is reused across requests.
         // A single per-server key is valid: DPoP keys are client keys, not per-user.
@@ -197,52 +282,17 @@ class SolidClientFactory
             $jwk = new JWK($jwkData);
         }
 
-        $dpopProofFactory = new DpopProofFactory(
-            $jwk,
-            new JWSBuilder(new AlgorithmManager([new ES256()])),
-            new CompactSerializer()
-        );
+        return $jwk;
+    }
 
-        /*/ RFC9449 - DPoP - Section 5: DPoP proof is injected automatically by DpopAuthMethod /*/
-        $methods = [
-            new DpopAuthMethod(new ClientSecretBasic(), $dpopProofFactory),
-            new DpopAuthMethod(new ClientSecretJwt(), $dpopProofFactory),
-            new DpopAuthMethod(new ClientSecretPost(), $dpopProofFactory),
-            new DpopAuthMethod(new None(), $dpopProofFactory),
-            new DpopAuthMethod(new PrivateKeyJwt(), $dpopProofFactory),
-            new DpopAuthMethod(new TLSClientAuth(), $dpopProofFactory),
-            new DpopAuthMethod(new SelfSignedTLSClientAuth(), $dpopProofFactory),
-        ];
-        // Initialise DPoP key pair (persisted to disk so the same key is reused across requests).
-        $dpopAuthMethodFactory = new AuthMethodFactory($methods);
-
+    private function createOidcClientBuilder(
+        AuthMethodFactory $dpopAuthMethodFactory,
+        HttpClient $httpClient
+    ): ClientBuilder {
         $oidcClientBuilder = new ClientBuilder();
-        $oidcClientBuilder = $oidcClientBuilder
+
+        return $oidcClientBuilder
             ->setAuthMethodFactory($dpopAuthMethodFactory)
             ->setHttpClient($httpClient);
-
-        // ---------------------------------------------------------------------
-        $registrationServiceBuilder = new RegistrationServiceBuilder();
-        $registration = $registrationServiceBuilder->build();
-
-        $authorizationServiceBuilder = new AuthorizationServiceBuilder();
-        $authorizationService = $authorizationServiceBuilder
-            ->setHttpClient($httpClient)
-            ->build();
-
-        // ---------------------------------------------------------------------
-        $graph = new Graph();
-
-        return [
-            'authorizationService' => $authorizationService,
-            'dpopProofFactory' => $dpopProofFactory,
-            'filesystem' => $filesystem,
-            'graph' => $graph,
-            'httpClient' => $httpClient,
-            'idTokenVerifierBuilder' => new IdTokenVerifierBuilder(),
-            'issuerBuilder' => $issuerBuilder,
-            'oidcClientBuilder' => $oidcClientBuilder,
-            'registration' => $registration,
-        ];
     }
 }
