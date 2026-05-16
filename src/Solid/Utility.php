@@ -22,6 +22,16 @@ class Utility
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 
+    final public static function createSignature($data, $key): string
+    {
+        return static::base64UrlEncode(hash_hmac(
+            'sha256',
+            $data,
+            $key,
+            true
+        ));
+    }
+
     /**
      * @throws \JsonException
      */

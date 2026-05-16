@@ -555,12 +555,15 @@ class SolidClient
             'exp' => time() + $this->config['state']['TtlSeconds'],
             'issr' => $issuerUrl,
         ], JSON_THROW_ON_ERROR));
-        $signature = Utility::base64UrlEncode(hash_hmac('sha256', $header . '.' . $payload,
-            $this->config['state']['SigningKey'],
-            true));
-        $state = $header . '.' . $payload . '.' . $signature;
 
-        if ($this->config['useCsrfCheck'] === true) {
+        $signature = Utility::createSignature($header . '.' . $payload, $this->config['state']['SigningKey']);
+        $state = vsprintf("%s.%s.%s", [
+            $header,
+            $payload,
+            $signature
+        ]);
+
+        if ($this->config->useCsrf() === true) {
             $session->set('oauth_state', $state);
         }
 
@@ -604,9 +607,7 @@ class SolidClient
             $header = json_decode(Utility::base64UrlDecode($parts[0]), true, 512, JSON_THROW_ON_ERROR);
             $payload = json_decode(Utility::base64UrlDecode($parts[1]), true, 512, JSON_THROW_ON_ERROR);
 
-            $expectedSignature = Utility::base64UrlEncode(hash_hmac('sha256', $parts[0] . '.' . $parts[1],
-                $this->config['state']['SigningKey'],
-                true));
+            $expectedSignature = Utility::createSignature($parts[0] . '.' . $parts[1], $this->config['state']['SigningKey']);
 
             if (! is_array($header) || ($header['alg'] ?? null) !== 'HS256') {
                 $error = 'State JWT must use HS256';
