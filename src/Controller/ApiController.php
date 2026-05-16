@@ -226,7 +226,7 @@ class ApiController extends AbstractController
                     ?? $queryParams['connected']
                     ?? null;
 
-                $solidClient = $this->solidClientFactory->create($request);
+                $solidClient = $this->solidClientFactory->create();
 
                 if (isset($queryParams['error'])) {
                     $response['content'] = [[
@@ -362,7 +362,7 @@ class ApiController extends AbstractController
         if (isset($apiKey)) {
             $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
 
-            $solidClient = $this->solidClientFactory->create($request);
+            $solidClient = $this->solidClientFactory->create();
 
             $storageUrls = $solidClient->fetchStorageUrls($webId);
 
@@ -544,7 +544,7 @@ class ApiController extends AbstractController
                         $dateTime->setTimezone(new \DateTimeZone('Europe/Amsterdam'));
                         $timestamp = $dateTime->format('Ymd.His');
 
-                        $solidClient = $this->solidClientFactory->create($request);
+                        $solidClient = $this->solidClientFactory->create();
 
                         // @FIXME: Read StorageUrl from persistent configuration instead of resolving it on every request.
                         if (empty($storageUrl)) {
@@ -694,7 +694,7 @@ class ApiController extends AbstractController
 
                 $isConnected = true;
                 if ($version >= 0.4) {
-                    $solidClient = $this->solidClientFactory->create($request);
+                    $solidClient = $this->solidClientFactory->create();
                     $isConnected = $solidClient->isWebIdConnected($webId);
 
                     if (! $isConnected) {

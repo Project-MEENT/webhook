@@ -27,12 +27,18 @@ use Jose\Component\Signature\JWSBuilder;
 use Jose\Component\Signature\Serializer\CompactSerializer;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
-use Psr\Http\Message\RequestInterface;
 use Psr\SimpleCache\CacheInterface;
 
 class SolidClientFactory
 {
-    final public function create(RequestInterface $request): SolidClient
+    private string $clientRedirectUri;
+
+    final public function __construct($clientRedirectUri)
+    {
+        $this->clientRedirectUri = $clientRedirectUri;
+    }
+
+    final public function create(): SolidClient
     {
         $httpClientConfig = [
             // Allow self-signed certificates for local development
@@ -73,7 +79,7 @@ class SolidClientFactory
             $clientRedirectUris = $clientConfig['redirect_uris'];
             $clientRedirectUri = reset($clientRedirectUris);
         } else {
-            $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
+            $clientRedirectUri = $this->clientRedirectUri;
             $clientRedirectUris = [ $clientRedirectUri ];
         }
         $clientSecret = $clientConfig['client_secret'] ?? Utility::base64UrlEncode(random_bytes(32));

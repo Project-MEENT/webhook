@@ -73,7 +73,8 @@ switch ($accept[0]) {
 
 switch ($rootPath) {
     case 'api':
-        $solidClientFactory = new SolidClientFactory();
+        $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
+        $solidClientFactory = new SolidClientFactory($clientRedirectUri);
         $controller = new \Meent\WebHook\Controller\ApiController($filesystem, $solidClientFactory);
         try {
             $response = $controller->handleRequest($request, $response);
