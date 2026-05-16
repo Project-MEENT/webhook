@@ -172,15 +172,15 @@ class SolidClientFactory
         // RFC9449 - DPoP - Section 5.  DPoP Access Token Request
         // Initialise DPoP key pair — persisted to disk so the same key is reused across requests.
         // A single per-server key is valid: DPoP keys are client keys, not per-user.
-        $dpopJwkFile = rtrim($storageLocation, '/') . '/dpop_jwk.json';
-
-        if (file_exists($dpopJwkFile)) {
-            $jwkData = json_decode(file_get_contents($dpopJwkFile), true, 512, JSON_THROW_ON_ERROR);
+        if ($filesystem->fileExists($dpopJwkFile)) {
+            $json = $filesystem->read($dpopJwkFile);
+            $jwkData = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         }
 
-        if (! isset($jwkData) || ! is_array($jwkData) || ! isset($jwkData['kty'])) {
+        if (empty($jwkData) || ! is_array($jwkData) || ! isset($jwkData['kty'])) {
             $jwk = JWKFactory::createECKey('P-256');
-            file_put_contents($dpopJwkFile, json_encode($jwk->all(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+            $jwkData = json_encode($jwk->all(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $filesystem->write($dpopJwkFile, $jwkData);
         } else {
             $jwk = new JWK($jwkData);
         }
