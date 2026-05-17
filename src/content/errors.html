@@ -69,6 +69,21 @@
     }
 
     /* CSS-only tab display */
+    a#status-400,
+    a#status-401,
+    a#status-403,
+    a#status-404,
+    a#status-405,
+    a#status-407,
+    a#status-409,
+    a#status-422,
+    a#status-500,
+    a#status-501,
+    a#status-502,
+    a#status-504 {
+        display: none;
+    }
+
     #errors article {
         display: none;
     }
@@ -77,7 +92,22 @@
         display: block;
     }
 
-    /* Highlight nav link when its article is targeted */
+    html:has(#status-400:target) #errors article[data-status-code~="400"],
+    html:has(#status-401:target) #errors article[data-status-code~="401"],
+    html:has(#status-403:target) #errors article[data-status-code~="403"],
+    html:has(#status-404:target) #errors article[data-status-code~="404"],
+    html:has(#status-405:target) #errors article[data-status-code~="405"],
+    html:has(#status-407:target) #errors article[data-status-code~="407"],
+    html:has(#status-409:target) #errors article[data-status-code~="409"],
+    html:has(#status-422:target) #errors article[data-status-code~="422"],
+    html:has(#status-500:target) #errors article[data-status-code~="500"],
+    html:has(#status-501:target) #errors article[data-status-code~="501"],
+    html:has(#status-502:target) #errors article[data-status-code~="502"],
+    html:has(#status-504:target) #errors article[data-status-code~="504"] {
+        display: block;
+    }
+
+    /* Highlight nav link when its article or status code is targeted */
     html:has(#errors article#api-key-missing:target) header nav a[href="#api-key-missing"],
     html:has(#errors article#data-conversion-error:target) header nav a[href="#data-conversion-error"],
     html:has(#errors article#gateway-timeout:target) header nav a[href="#gateway-timeout"],
@@ -103,7 +133,20 @@
     html:has(#errors article#unexpected-output:target) header nav a[href="#unexpected-output"],
     html:has(#errors article#webid-already-registered:target) header nav a[href="#webid-already-registered"],
     html:has(#errors article#webid-not-connected:target) header nav a[href="#webid-not-connected"],
-    html:has(#errors article#write-failed:target) header nav a[href="#write-failed"] {
+    html:has(#errors article#write-failed:target) header nav a[href="#write-failed"],
+    html:has(#show-all:target) header nav a[href="#show-all"],
+    html:has(#status-400:target) header nav a[href="#status-400"],
+    html:has(#status-401:target) header nav a[href="#status-401"],
+    html:has(#status-403:target) header nav a[href="#status-403"],
+    html:has(#status-404:target) header nav a[href="#status-404"],
+    html:has(#status-405:target) header nav a[href="#status-405"],
+    html:has(#status-407:target) header nav a[href="#status-407"],
+    html:has(#status-409:target) header nav a[href="#status-409"],
+    html:has(#status-422:target) header nav a[href="#status-422"],
+    html:has(#status-500:target) header nav a[href="#status-500"],
+    html:has(#status-501:target) header nav a[href="#status-501"],
+    html:has(#status-502:target) header nav a[href="#status-502"],
+    html:has(#status-504:target) header nav a[href="#status-504"] {
         border-bottom-color: var(--color-secondary);
     }
 </style>
@@ -139,24 +182,57 @@
             <li><a href="#write-failed">Write Failed</a></li>
         </ul>
     </nav>
+    <hr>
+    <nav>
+        <strong>By status code:</strong>
+        <ul>
+            <li><a href="#status-400">400</a></li>
+            <li><a href="#status-401">401</a></li>
+            <li><a href="#status-403">403</a></li>
+            <li><a href="#status-404">404</a></li>
+            <li><a href="#status-405">405</a></li>
+            <li><a href="#status-407">407</a></li>
+            <li><a href="#status-409">409</a></li>
+            <li><a href="#status-422">422</a></li>
+            <li><a href="#status-500">500</a></li>
+            <li><a href="#status-501">501</a></li>
+            <li><a href="#status-502">502</a></li>
+            <li><a href="#status-504">504</a></li>
+        </ul>
+    </nav>
 </header>
 <main>
+    <a id="show-all"></a>
+    <a id="status-400"></a>
+    <a id="status-401"></a>
+    <a id="status-403"></a>
+    <a id="status-404"></a>
+    <a id="status-405"></a>
+    <a id="status-407"></a>
+    <a id="status-409"></a>
+    <a id="status-422"></a>
+    <a id="status-500"></a>
+    <a id="status-501"></a>
+    <a id="status-502"></a>
+    <a id="status-504"></a>
+
     <section id="errors">
-        <article id="api-key-missing">
+
+        <article data-status-code="401" id="api-key-missing">
             <header><h3 data-version="+v0.3">#api-key-missing</h3></header>
             <p>Returned when a request to a protected resource does not include an <code>Authorization: Bearer {api-key}</code> header.</p>
             <p><strong>Request:</strong> <code>POST /api/data</code> and <code data-version="+v0.3">GET /api/data</code></p>
             <p><strong>Response:</strong> 401 Unauthorized</p>
         </article>
 
-        <article id="data-conversion-error">
-            <header><h3 data-version="+v0.4 latest">#data-conversion-error</h3></header>
+        <article data-status-code="500" id="data-conversion-error">
+            <header><h3 data-version="+v0.4">#data-conversion-error</h3></header>
             <p>Returned when the webhook cannot convert received data to Turtle format for storage in the Solid Pod.</p>
             <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data</code></p>
             <p><strong>Response:</strong> 500 Internal Server Error</p>
         </article>
 
-        <article id="invalid-api-key">
+        <article data-status-code="401" id="invalid-api-key">
             <header><h3 data-version="+v0.3">#invalid-api-key</h3></header>
             <p>Returned when a Bearer token is provided with a request
                 , but there is no matching
@@ -165,14 +241,14 @@
             <p><strong>Response:</strong> 401 Unauthorized</p>
         </article>
 
-        <article id="invalid-api-version">
+        <article data-status-code="404" id="invalid-api-version">
             <header><h3 data-version="+v0.1">#invalid-api-version</h3></header>
             <p>Returned when the requested API version is not available or cannot be parsed.</p>
             <p><strong>Request:</strong> <code>Any /api/ request with invalid version</code></p>
             <p><strong>Response:</strong> 404 Not Found</p>
         </article>
 
-        <article id="invalid-auth-header">
+        <article data-status-code="400" id="invalid-auth-header">
             <header><h3 data-version="+v0.3">#invalid-auth-header</h3></header>
             <p>Returned when the <code>Authorization</code> header exists but does not start with the required <code>Bearer </code>scheme.
             </p>
@@ -180,14 +256,14 @@
             <p><strong>Response:</strong> 400 Bad Request</p>
         </article>
 
-        <article id="invalid-json">
-            <header><h3 data-version="+v0.4 latest">#invalid-json</h3></header>
+        <article data-status-code="422" id="invalid-json">
+            <header><h3 data-version="+v0.4">#invalid-json</h3></header>
             <p>Returned when the provided request body is not valid JSON.</p>
             <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data with malformed JSON</code></p>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
-        <article id="invalid-path">
+        <article data-status-code="400" id="invalid-path">
             <header><h3 data-version="+v0.2">#invalid-path</h3></header>
             <p>Returned when the requested data path does not resolve to a stored <code>.data</code> object below the
                 expected directory structure.</p>
@@ -195,42 +271,42 @@
             <p><strong>Response:</strong> 400 Bad Request</p>
         </article>
 
-        <article id="invalid-timestamp">
-            <header><h3 data-version="+v0.4 latest">#invalid-timestamp</h3></header>
+        <article data-status-code="422" id="invalid-timestamp">
+            <header><h3 data-version="+v0.4">#invalid-timestamp</h3></header>
             <p>Returned when the <code>timestamp</code> value in the provided JSON data cannot be parsed as a valid timestamp.</p>
             <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data with invalid timestamp</code></p>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
-        <article id="invalid-url">
+        <article data-status-code="422" id="invalid-url">
             <header><h3 data-version="+v0.3">#invalid-url</h3></header>
             <p>Returned when a submitted WebID is present, but is not a valid URL.</p>
             <p><strong>Request:</strong> <code>POST /api/register</code>, <code data-version="+v0.4 latest">POST /api/v0.4/consent</code>, and <code data-version="+v0.4 latest">GET /api/v0.4/data</code></p>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
-        <article id="method-not-allowed">
+        <article data-status-code="405" id="method-not-allowed">
             <header><h3>#method-not-allowed</h3></header>
             <p>Returned when a route is valid but the HTTP method is not, for instance when a <code>GET</code> request is made to a <code>POST</code> endpoint.</p>
             <p><strong>Request:</strong> <code>/api/data</code> and <code data-version="+v0.3">/api/register</code></p>
             <p><strong>Response:</strong> 405 Method Not Allowed</p>
         </article>
 
-        <article id="method-not-implemented">
+        <article data-status-code="501" id="method-not-implemented">
             <header><h3 data-version="+v0.1">#method-not-implemented</h3></header>
             <p>Returned when a method is recognized but has not yet been implemented for the requested endpoint.</p>
             <p><strong>Request:</strong> <code>PUT /api/register</code> or other unimplemented methods</p>
             <p><strong>Response:</strong> 501 Not Implemented</p>
         </article>
 
-        <article id="missing-timestamp">
-            <header><h3 data-version="+v0.4 latest">#missing-timestamp</h3></header>
+        <article data-status-code="422" id="missing-timestamp">
+            <header><h3 data-version="+v0.4">#missing-timestamp</h3></header>
             <p>Returned when the required <code>timestamp</code> field is missing from the JSON data being posted to the webhook.</p>
             <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data without timestamp field</code></p>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
-        <article id="no-data-received">
+        <article data-status-code="422" id="no-data-received">
             <header><h3>#no-data-received</h3></header>
             <p>Returned when the request body is empty. On the data endpoint this means no meter payload was supplied;
                 on the register endpoint it means no WebID was submitted.</p>
@@ -238,22 +314,22 @@
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
-        <article id="no-storage-url">
-            <header><h3 data-version="+v0.4 latest">#no-storage-url</h3></header>
+        <article data-status-code="422" id="no-storage-url">
+            <header><h3 data-version="+v0.4">#no-storage-url</h3></header>
             <p>Returned when the webhook cannot resolve a storage URL for the provided WebID. This occurs when fetching or storing data in a Solid Pod.</p>
             <p><strong>Request:</strong> <code data-version="+v0.4 latest">GET /api/v0.4/data or POST /api/v0.4/data</code></p>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
-        <article id="not-found">
+        <article data-status-code="404" id="not-found">
             <header><h3>#not-found</h3></header>
             <p>Returned when a requested resource does not exist</p>
             <p><strong>Request:</strong> Any unknown or unsupported API route, or non-existing file in <code data-type="+v0.2">/data/</code></p>
             <p><strong>Response:</strong> 404 Not Found</p>
         </article>
 
-        <article id="gateway-timeout">
-            <header><h3 data-version="+v0.4 latest">#gateway-timeout</h3></header>
+        <article data-status-code="504" id="gateway-timeout">
+            <header><h3 data-version="+v0.4">#gateway-timeout</h3></header>
             <p>Returned when an upstream Solid Pod or identity provider does not respond within the allowed time.</p>
             <p>Examples include:</p>
             <ul>
@@ -267,14 +343,14 @@
             <p><strong>Response:</strong> 504 Gateway Timeout</p>
         </article>
 
-        <article id="provider-error">
-            <header><h3 data-version="+v0.4 latest">#provider-error</h3></header>
+        <article data-status-code="502" id="provider-error">
+            <header><h3 data-version="+v0.4">#provider-error</h3></header>
             <p>Returned when the OIDC provider (authorization server) returns an error during the authentication flow.</p>
             <p><strong>Request:</strong> <code data-version="+v0.4 latest">GET /api/v0.4/consent?error=...</code></p>
             <p><strong>Response:</strong> 502 Bad Gateway</p>
         </article>
 
-        <article id="response-encoding-failed">
+        <article data-status-code="500" id="response-encoding-failed">
             <header><h3>#response-encoding-failed</h3></header>
             <p>Returned when the final problem or data response cannot be converted to JSON, for example because the
                 response payload contains an unsupported value.</p>
@@ -282,8 +358,8 @@
             <p><strong>Response:</strong> 500 Internal Server Error</p>
         </article>
 
-        <article id="solid-error">
-            <header><h3 data-version="+v0.4 latest">#solid-error</h3></header>
+        <article data-status-code="400 401 403 500 502 504" id="solid-error">
+            <header><h3 data-version="+v0.4">#solid-error</h3></header>
             <p>Returned when an error occurs during Solid Pod authentication or authorization. See specific error types (<code>#provider-error</code>, <code>#solid-fetch-error</code>, <code>#solid-write-error</code>) for details on particular failure modes.</p>
             <p>Examples include:</p>
             <ul>
@@ -301,8 +377,8 @@
             <p><strong>Response:</strong> 502 Bad Gateway for upstream failures, 504 Gateway Timeout for upstream timeouts, 500 Internal Server Error for webhook session/state errors, and propagated upstream 4xx (including 511 for upstream auth failures)</p>
         </article>
 
-        <article id="solid-fetch-error">
-            <header><h3 data-version="+v0.4 latest">#solid-fetch-error</h3></header>
+        <article data-status-code="502" id="solid-fetch-error">
+            <header><h3 data-version="+v0.4">#solid-fetch-error</h3></header>
             <p>Returned when an error occurs while fetching a resource from a Solid Pod.</p>
             <p>Examples include:</p>
             <ul>
@@ -314,8 +390,8 @@
             <p><strong>Response:</strong> 502 Bad Gateway</p>
         </article>
 
-        <article id="solid-write-error">
-            <header><h3 data-version="+v0.4 latest">#solid-write-error</h3></header>
+        <article data-status-code="502" id="solid-write-error">
+            <header><h3 data-version="+v0.4">#solid-write-error</h3></header>
             <p>Returned when an error occurs while writing a resource to a Solid Pod.</p>
             <p>Examples include:</p>
             <ul>
@@ -328,7 +404,7 @@
             <p><strong>Response:</strong> 502 Bad Gateway</p>
         </article>
 
-        <article id="unexpected-error">
+        <article data-status-code="500" id="unexpected-error">
             <header><h3>#unexpected-error</h3></header>
             <p>Catch-all problem for unhandled server errors, including unexpected logic or
                 routing failures.</p>
@@ -336,7 +412,7 @@
             <p><strong>Response:</strong> 500 Internal Server Error</p>
         </article>
 
-        <article id="unexpected-output">
+        <article data-status-code="500" id="unexpected-output">
             <header><h3>#unexpected-output</h3></header>
             <p>Returned when unexpected server output appears before the response is complete. The captured output
                 is included in the error detail for debugging.</p>
@@ -344,21 +420,21 @@
             <p><strong>Response:</strong> 500 Internal Server Error</p>
         </article>
 
-        <article id="webid-already-registered">
+        <article data-status-code="409" id="webid-already-registered">
             <header><h3 data-version="+v0.3">#webid-already-registered</h3></header>
             <p>Returned when a submitted WebID has already been registered. Use <code>PUT</code> to update an existing registration (requires <code>Authorization</code> header).</p>
             <p><strong>Request:</strong> <code data-version="+v0.3">POST /api/register</code></p>
             <p><strong>Response:</strong> 409 Conflict</p>
         </article>
 
-        <article id="webid-not-connected">
-            <header><h3 data-version="+v0.4 latest">#webid-not-connected</h3></header>
+        <article data-status-code="407" id="webid-not-connected">
+            <header><h3 data-version="+v0.4">#webid-not-connected</h3></header>
             <p>Returned when attempting to register a WebID that has not yet been authenticated with the webhook. The user must first complete the authentication flow at the provided consent URL.</p>
             <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/register with unconnected WebID</code></p>
             <p><strong>Response:</strong> 407 Proxy Authentication Required</p>
         </article>
 
-        <article id="write-failed">
+        <article data-status-code="502" id="write-failed">
             <header><h3>#write-failed</h3></header>
             <p>Returned when the storage layer fails while checking, reading,
                 writing, or creating stored API resources.</p>
