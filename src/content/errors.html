@@ -14,7 +14,12 @@
         border-radius: var(--border-radius);
         border: solid var(--color-secondary) 1px;
         margin: 1rem;
+        max-width: var(--width-card-wide);
         padding: 1rem;
+    }
+
+    hr {
+        margin: 0;
     }
 
     /* Version Tag */
@@ -30,16 +35,14 @@
         transform: translateY(-0.85rem);
     }
 
-    [data-version~="latest"]::after {
-        background-color: var(--color-secondary-accent);
-    }
-
     [data-version~="+v0.5"]::after {
         color: var(--lt-color-gray-200);
     }
 
     [data-version~="+v0.4"]::after {
         color: var(--lt-color-gray-300);
+        /* Latest */
+        background-color: var(--color-secondary-accent);
     }
 
     [data-version~="+v0.3"]::after {
@@ -50,8 +53,21 @@
         color: var(--lt-color-gray-500);
     }
 
+    /*
+     * Hide nested version badge on request URLs when it duplicates the article badge
+     * and there are no differently-versioned URL badges in the same article.
+     */
+    article:has(> header h3[data-version~="+v0.5"]):not(:has(code[data-version]:not([data-version~="+v0.5"]))) code[data-version~="+v0.5"]::after,
+    article:has(> header h3[data-version~="+v0.4"]):not(:has(code[data-version]:not([data-version~="+v0.4"]))) code[data-version~="+v0.4"]::after,
+    article:has(> header h3[data-version~="+v0.3"]):not(:has(code[data-version]:not([data-version~="+v0.3"]))) code[data-version~="+v0.3"]::after,
+    article:has(> header h3[data-version~="+v0.2"]):not(:has(code[data-version]:not([data-version~="+v0.2"]))) code[data-version~="+v0.2"]::after,
+    article:has(> header h3[data-version~="+v0.1"]):not(:has(code[data-version]:not([data-version~="+v0.1"]))) code[data-version~="+v0.1"]::after {
+        display: none;
+    }
+
     /* Error List */
     header, nav {
+        justify-content: center;
         margin-bottom: 0;
         padding-bottom: 0;
     }
@@ -92,6 +108,7 @@
         display: block;
     }
 
+    html:has(#show-all:target) #errors article,
     html:has(#status-400:target) #errors article[data-status-code~="400"],
     html:has(#status-401:target) #errors article[data-status-code~="401"],
     html:has(#status-403:target) #errors article[data-status-code~="403"],
@@ -152,6 +169,7 @@
 </style>
 <header>
     <h1><title>Possible Errors</title></h1>
+    <nav><a href="#show-all">Show All</a></li></nav><hr>
     <nav>
         <ul>
             <li><a href="#api-key-missing">API Key Missing</a></li>
@@ -221,14 +239,18 @@
         <article data-status-code="401" id="api-key-missing">
             <header><h3 data-version="+v0.3">#api-key-missing</h3></header>
             <p>Returned when a request to a protected resource does not include an <code>Authorization: Bearer {api-key}</code> header.</p>
-            <p><strong>Request:</strong> <code>POST /api/data</code> and <code data-version="+v0.3">GET /api/data</code></p>
+            <p><strong>Request:</strong></p>
+            <ul>
+                <li><code>POST /api/data</code></li>
+                <li><code data-version="+v0.3">GET /api/data</code></li>
+            </ul>
             <p><strong>Response:</strong> 401 Unauthorized</p>
         </article>
 
         <article data-status-code="500" id="data-conversion-error">
             <header><h3 data-version="+v0.4">#data-conversion-error</h3></header>
             <p>Returned when the webhook cannot convert received data to Turtle format for storage in the Solid Pod.</p>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data</code></p>
+            <p><strong>Request:</strong> <code data-version="+v0.4">POST /api/data</code></p>
             <p><strong>Response:</strong> 500 Internal Server Error</p>
         </article>
 
@@ -244,7 +266,7 @@
         <article data-status-code="404" id="invalid-api-version">
             <header><h3 data-version="+v0.1">#invalid-api-version</h3></header>
             <p>Returned when the requested API version is not available or cannot be parsed.</p>
-            <p><strong>Request:</strong> <code>Any /api/ request with invalid version</code></p>
+            <p><strong>Request:</strong> Any <code>/api/</code> request with invalid version</p>
             <p><strong>Response:</strong> 404 Not Found</p>
         </article>
 
@@ -259,7 +281,7 @@
         <article data-status-code="422" id="invalid-json">
             <header><h3 data-version="+v0.4">#invalid-json</h3></header>
             <p>Returned when the provided request body is not valid JSON.</p>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data with malformed JSON</code></p>
+            <p><strong>Request:</strong> <code data-version="+v0.4">POST /api/data</code> with malformed JSON</p>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
@@ -274,21 +296,30 @@
         <article data-status-code="422" id="invalid-timestamp">
             <header><h3 data-version="+v0.4">#invalid-timestamp</h3></header>
             <p>Returned when the <code>timestamp</code> value in the provided JSON data cannot be parsed as a valid timestamp.</p>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data with invalid timestamp</code></p>
+            <p><strong>Request:</strong> <code data-version="+v0.4">POST /api/data</code> with invalid timestamp</p>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
         <article data-status-code="422" id="invalid-url">
             <header><h3 data-version="+v0.3">#invalid-url</h3></header>
             <p>Returned when a submitted WebID is present, but is not a valid URL.</p>
-            <p><strong>Request:</strong> <code>POST /api/register</code>, <code data-version="+v0.4 latest">POST /api/v0.4/consent</code>, and <code data-version="+v0.4 latest">GET /api/v0.4/data</code></p>
+            <p><strong>Request:</strong></p>
+            <ul>
+                <li><code data-version="+v0.3">POST /api/register</code></li>
+                <li><code data-version="+v0.4">POST /api/consent</code></li>
+                <li><code data-version="+v0.4">GET /api/data</code></li>
+            </ul>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
         <article data-status-code="405" id="method-not-allowed">
             <header><h3>#method-not-allowed</h3></header>
             <p>Returned when a route is valid but the HTTP method is not, for instance when a <code>GET</code> request is made to a <code>POST</code> endpoint.</p>
-            <p><strong>Request:</strong> <code>/api/data</code> and <code data-version="+v0.3">/api/register</code></p>
+            <p><strong>Request:</strong></p>
+            <ul>
+                <li><code>/api/data</code></li>
+                <li><code data-version="+v0.3">/api/register</code></li>
+            </ul>
             <p><strong>Response:</strong> 405 Method Not Allowed</p>
         </article>
 
@@ -302,7 +333,7 @@
         <article data-status-code="422" id="missing-timestamp">
             <header><h3 data-version="+v0.4">#missing-timestamp</h3></header>
             <p>Returned when the required <code>timestamp</code> field is missing from the JSON data being posted to the webhook.</p>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data without timestamp field</code></p>
+            <p><strong>Request:</strong> <code data-version="+v0.4">POST /api/data</code> without timestamp field</p>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
@@ -310,14 +341,22 @@
             <header><h3>#no-data-received</h3></header>
             <p>Returned when the request body is empty. On the data endpoint this means no meter payload was supplied;
                 on the register endpoint it means no WebID was submitted.</p>
-            <p><strong>Request:</strong> <code>POST /api/data</code> and <code data-version="+v0.3">POST /api/register</code></p>
+            <p><strong>Request:</strong></p>
+            <ul>
+                <li><code>POST /api/data</code></li>
+                <li><code data-version="+v0.3">POST /api/register</code></li>
+            </ul>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
         <article data-status-code="422" id="no-storage-url">
             <header><h3 data-version="+v0.4">#no-storage-url</h3></header>
             <p>Returned when the webhook cannot resolve a storage URL for the provided WebID. This occurs when fetching or storing data in a Solid Pod.</p>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">GET /api/v0.4/data or POST /api/v0.4/data</code></p>
+            <p><strong>Request:</strong></p>
+            <ul>
+                <li><code data-version="+v0.4">GET /api/data</code></li>
+                <li><code data-version="+v0.4">POST /api/data</code></li>
+            </ul>
             <p><strong>Response:</strong> 422 Unprocessable Entity</p>
         </article>
 
@@ -337,16 +376,19 @@
                 <li>The Solid Pod's resource endpoint timed out during a read or write</li>
                 <li>The identity provider did not respond in time during the redirect flow</li>
             </ul>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">GET
-                /api/v0.4/consent?code=...&state=...</code>, <code>GET /api/v0.4/data/{path}</code>, or <code>POST
-                /api/v0.4/data</code></p>
+            <p><strong>Request:</strong></p>
+            <ul>
+                <li><code>POST /api/data</code></li>
+                <li><code>GET /api/data/{path}</code></li>
+                <li><code data-version="+v0.4">GET /api/consent?code=...&state=...</code></li>
+            </ul>
             <p><strong>Response:</strong> 504 Gateway Timeout</p>
         </article>
 
         <article data-status-code="502" id="provider-error">
             <header><h3 data-version="+v0.4">#provider-error</h3></header>
             <p>Returned when the OIDC provider (authorization server) returns an error during the authentication flow.</p>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">GET /api/v0.4/consent?error=...</code></p>
+            <p><strong>Request:</strong> <code data-version="+v0.4">GET /api/consent?error=...</code></p>
             <p><strong>Response:</strong> 502 Bad Gateway</p>
         </article>
 
@@ -373,8 +415,12 @@
                 <li>Could not resolve an OIDC issuer from the provided WebID</li>
                 <li>Upstream token/resource endpoints rejecting or timing out requests</li>
             </ul>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">GET /api/v0.4/consent?code=...&state=...</code> or <code>POST /api/v0.4/consent</code></p>
-            <p><strong>Response:</strong> 502 Bad Gateway for upstream failures, 504 Gateway Timeout for upstream timeouts, 500 Internal Server Error for webhook session/state errors, and propagated upstream 4xx (including 511 for upstream auth failures)</p>
+            <p><strong>Request:</strong></p>
+            <ul>
+                <li><code data-version="+v0.4">GET /api/consent?code=...&state=...</code></li>
+                <li><code data-version="+v0.4">POST /api/consent</code></li>
+            </ul>
+            <p><strong>Response:</strong> 502 Bad Gateway for upstream failures, 504 Gateway Timeout (see <a href="#gateway-timeout">#gateway-timeout</a>) for upstream timeouts, 500 Internal Server Error for session/state errors, and propagated upstream 4xx (including 511 for upstream authentication failures)</p>
         </article>
 
         <article data-status-code="502" id="solid-fetch-error">
@@ -386,7 +432,7 @@
                 <li>Authentication/authorization failure from the Solid Pod</li>
                 <li>Resource not found on the Solid Pod</li>
             </ul>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">GET /api/v0.4/data/{path}</code></p>
+            <p><strong>Request:</strong> <code data-version="+v0.4">GET /api/data/{path}</code></p>
             <p><strong>Response:</strong> 502 Bad Gateway</p>
         </article>
 
@@ -400,7 +446,7 @@
                 <li>Storage quota exceeded on the Solid Pod</li>
                 <li>Permission denied to write to the requested location</li>
             </ul>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/data</code></p>
+            <p><strong>Request:</strong> <code data-version="+v0.4">POST /api/data</code></p>
             <p><strong>Response:</strong> 502 Bad Gateway</p>
         </article>
 
@@ -422,7 +468,9 @@
 
         <article data-status-code="409" id="webid-already-registered">
             <header><h3 data-version="+v0.3">#webid-already-registered</h3></header>
-            <p>Returned when a submitted WebID has already been registered. Use <code>PUT</code> to update an existing registration (requires <code>Authorization</code> header).</p>
+            <p>Returned when a submitted WebID has already been registered.
+            <!-- Use <code>PUT</code> to update an existing registration (requires <code>Authorization</code> header). -->
+            </p>
             <p><strong>Request:</strong> <code data-version="+v0.3">POST /api/register</code></p>
             <p><strong>Response:</strong> 409 Conflict</p>
         </article>
@@ -430,7 +478,7 @@
         <article data-status-code="407" id="webid-not-connected">
             <header><h3 data-version="+v0.4">#webid-not-connected</h3></header>
             <p>Returned when attempting to register a WebID that has not yet been authenticated with the webhook. The user must first complete the authentication flow at the provided consent URL.</p>
-            <p><strong>Request:</strong> <code data-version="+v0.4 latest">POST /api/v0.4/register with unconnected WebID</code></p>
+            <p><strong>Request:</strong> <code data-version="+v0.4">POST /api/register</code> with unconnected WebID</p>
             <p><strong>Response:</strong> 407 Proxy Authentication Required</p>
         </article>
 
