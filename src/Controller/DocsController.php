@@ -111,6 +111,12 @@ class DocsController extends AbstractController
             }
         }
 
+        $replace =[
+            './docs/usage.md' => '/docs/',
+        ];
+
+        $response['content'] = str_replace(array_keys($replace), $replace, $response['content']);
+
         return $response;
     }
 
