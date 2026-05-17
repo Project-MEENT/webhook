@@ -184,7 +184,7 @@ if ($outputType === 'html') {
         'title' => $response['title'] ?: $response['type'],
     ];
 
-    if ($response['content'] !== null) {
+    if (! empty($response['content'])) {
         $body[$key] = $response['content'];
     }
 
