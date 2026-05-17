@@ -215,5 +215,5 @@ array_walk($response['headers'], static function ($values, $name) {
     });
 });
 header_remove('X-Powered-By');
-echo trim($content);
+echo trim((string) $content);
 exit;
