@@ -134,7 +134,9 @@ if ($output) {
 $content = $response['content'] ?? null;
 
 if ($outputType === 'html') {
-    $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
+    if (! isset($response['headers']['Content-Type'])) {
+        $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
+    }
 
     if (is_array($content) || $response['title'] !== '') {
         if ($response['type'] === '/errors/') {
