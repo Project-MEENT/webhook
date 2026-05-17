@@ -1,4 +1,4 @@
-# MEENT Webhook
+# MEENT Solid P1 Dongle Webhook
 
 Webhook for writing data from a P1 dongle as Linked Data to a Solid Pod.
 
@@ -11,23 +11,24 @@ Visit the webhook at: https://meent.dev.muze.nl/
 
 The webhook consists of [a REST API][1] and accompanying [documentation][2].
 
-To send data to the Meent Webhook, an API key is required.
+There are five things needed to work with this WebHook:
 
-Such an API key can be retrieved by registering a WebID.
+1. **Pod** A user must have a Solid Pod
+2. **Consent** A user must grant the Webhook permission to write to their Pod
+3. **WebID** A user must provide the Dongle with a WebId URL
+4. **API Key** The dongle must register the WebId URL to receive an API key
+5. **Write** The dongle can then use the API key to send data to the Webhook
 
-The API key is coupled to the provided WebID URL. The WebID URL can be updated if it changes.
-It is currently not possible to connect more than one WebID to an API key, or to update (or delete) an API key.
+For more details visit the [usage documentation](./docs/usage.md).
 
-A [WebID][3] is a URL where a WebID Document can be found.
-In the WebID Document, as specified by the [Solid WebID Profile][4] specification,
-information can be found as to which Identity Provider ([`solid:oidcIssuer`][5]) and Storage Provider ([`pim:storage`][6]) to use for data storage.
+## Contribute
 
-To store data in a Solid Pod, a POST request can be sent to the data endpoint, using the API key as the Authorization header.
-The posted data can also be retrieved, which also requires the API key.
-Currently, data cannot be updated or deleted.
+At this point, contributions are not expected.
+
+## License
 
 [1]: https://meent.dev.muze.nl/api/
-[2]: https://meent.dev.muze.nl/docs/
+[2]: ./docs/
 [3]: https://w3c-cg.github.io/WebID/spec/identity/
 [4]: https://solid.github.io/webid-profile/
 [5]: https://solidproject.org/TR/oidc#oidc-issuer-discovery

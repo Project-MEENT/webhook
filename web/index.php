@@ -165,7 +165,7 @@ if ($outputType === 'html') {
             'main' => '<section><h2>' . ($response['title'] ?? 'Response') . '</h2>' . $body. '</section>',
             'script' => '',
             'style' => 'h2 {width: 100%;}',
-            'title' => 'MEENT ️Web Hook',
+            'title' => 'MEENT Solid P1 Dongle Webhook',
         ]);
     }
 } else {
