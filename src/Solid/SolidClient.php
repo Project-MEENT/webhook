@@ -562,7 +562,7 @@ class SolidClient
             'issr' => $issuerUrl,
         ], JSON_THROW_ON_ERROR));
 
-        $signature = Utility::createSignature($header . '.' . $payload, $this->config['state']['SigningKey']);
+        $signature = Utility::createSignature($header . '.' . $payload, $this->config->stateSigningKey());
         $state = vsprintf("%s.%s.%s", [
             $header,
             $payload,
