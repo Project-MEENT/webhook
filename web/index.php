@@ -18,10 +18,14 @@ session_start();
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// Create FileSystem
-$adapter = new LocalFilesystemAdapter(__DIR__ . '/../build/data');
-// @TODO: Replace local filesystem with Solid Pod filesystem
-$filesystem = new Filesystem($adapter);
+$config = Config::fromFile(__DIR__ . '/../config.php');
+
+// Create FileSystems
+$dataFileSystemAdapter = new LocalFilesystemAdapter($config->get('api_storage_path'));
+$dataFilesystem = new Filesystem($dataFileSystemAdapter);
+
+$clientFilesystemAdapter = new LocalFilesystemAdapter($config->get('solid_storage_path'));
+$clientFilesystem = new Filesystem($clientFilesystemAdapter);
 
 // Create PSR Request and Response objects
 $request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
@@ -74,8 +78,8 @@ switch ($accept[0]) {
 switch ($rootPath) {
     case 'api':
         $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
-        $solidClientFactory = new SolidClientFactory($clientRedirectUri);
-        $controller = new \Meent\WebHook\Controller\ApiController($filesystem, $solidClientFactory);
+        $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $clientRedirectUri);
+        $controller = new \Meent\WebHook\Controller\ApiController($dataFilesystem, $solidClientFactory);
         try {
             $response = $controller->handleRequest($request, $response);
         } catch (FilesystemException $exception) {

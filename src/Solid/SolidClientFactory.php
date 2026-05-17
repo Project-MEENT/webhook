@@ -26,22 +26,24 @@ use Jose\Component\KeyManagement\JWKFactory;
 use Jose\Component\Signature\Algorithm\ES256;
 use Jose\Component\Signature\JWSBuilder;
 use Jose\Component\Signature\Serializer\CompactSerializer;
-use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemOperator;
-use League\Flysystem\InMemory\InMemoryFilesystemAdapter;
-use League\Flysystem\Local\LocalFilesystemAdapter;
 use MatthiasMullie\Scrapbook\Adapters\Flysystem;
 use MatthiasMullie\Scrapbook\Adapters\MemoryStore;
 use MatthiasMullie\Scrapbook\Psr16\SimpleCache;
+use Meent\WebHook\Config;
 use Psr\SimpleCache\CacheInterface;
 
 class SolidClientFactory
 {
     private string $clientRedirectUri;
+    private Config $config;
+    private FilesystemOperator $filesystem;
 
-    final public function __construct($clientRedirectUri)
+    final public function __construct(Config $config, FilesystemOperator $filesystem, $clientRedirectUri)
     {
         $this->clientRedirectUri = $clientRedirectUri;
+        $this->config = $config;
+        $this->filesystem = $filesystem;
     }
 
     final public function create(): SolidClient
@@ -54,31 +56,25 @@ class SolidClientFactory
         ];
 
         $clientConfigFile = 'client_metadata.json';
-        $clientName = 'MEENT Solid P1 Dongle Webhook';
         $clientRedirectUri = $this->clientRedirectUri;
         $dpopJwkFile = 'dpop_jwk.json';
-        $metadataCacheTtlSeconds = 86400 * 30; // Cache metadata for 30 days
-        $storageLocation = __DIR__ . '/../../build/storage';
-        $ttlSeconds = 300;
         $useCsrf = true;
         $useOffline = true;
         $usePkce = true;
 
-        $filesystem = $this->createFilesystem($storageLocation);
-
         $oidcClientConfig = $this->createClientConfig(
-            $filesystem,
+            $this->filesystem,
             $clientConfigFile,
-            $clientName,
+            $this->config->get(Config::KEY_CLIENT_NAME),
             $clientRedirectUri,
         );
 
-        $cache = $this->createCache($filesystem);
+        $cache = $this->createCache($this->filesystem);
 
         $httpClient = new HttpClient($httpClientConfig);
 
-        $issuerBuilder = $this->createIssuerBuilder($httpClient, $cache, $metadataCacheTtlSeconds);
-        $dpopProofFactory = $this->createDpopProofFactory($filesystem, $dpopJwkFile);
+        $issuerBuilder = $this->createIssuerBuilder($httpClient, $this->config, $cache);
+        $dpopProofFactory = $this->createDpopProofFactory($this->filesystem, $dpopJwkFile);
         $dpopAuthMethodFactory = $this->createDpopAuthMethodFactory($dpopProofFactory);
         $oidcClientBuilder = $this->createOidcClientBuilder($dpopAuthMethodFactory, $httpClient);
 
@@ -93,7 +89,7 @@ class SolidClientFactory
             useCsrf: $useCsrf,
             useOffline: $useOffline,
             usePkce: $usePkce,
-            expirationTime: $ttlSeconds,
+            expirationTime: $this->config->get(Config::KEY_JWT_TTL),
             // @FIXME: Use separate secret (i.e. private key) for signing, so it can be rotated.
             stateSigningKey: $oidcClientConfig->clientSecret(),
         );
@@ -104,7 +100,7 @@ class SolidClientFactory
             $authorizationService,
             $oidcClientBuilder,
             $dpopProofFactory,
-            $filesystem,
+            $this->filesystem,
             new Graph(),
             $httpClient,
             new IdTokenVerifierBuilder(),
@@ -162,9 +158,9 @@ class SolidClientFactory
             ->build();
     }
 
-    private function createCache(Filesystem $filesystem): ?SimpleCache
+    private function createCache(FilesystemOperator $filesystem): ?SimpleCache
     {
-        if ($filesystem && class_exists('\\MatthiasMullie\\Scrapbook\\Adapters\\Flysystem')) {
+        if (class_exists('\\MatthiasMullie\\Scrapbook\\Adapters\\Flysystem')) {
             $store = new Flysystem($filesystem);
         } elseif (class_exists('\\MatthiasMullie\\Scrapbook\\Adapters\\MemoryStore')) {
             $store = new MemoryStore();
@@ -199,7 +195,7 @@ class SolidClientFactory
         return new AuthMethodFactory($methods);
     }
 
-    private function createDpopProofFactory(Filesystem $filesystem, string $dpopJwkFile): DpopProofFactory
+    private function createDpopProofFactory(FilesystemOperator $filesystem, string $dpopJwkFile): DpopProofFactory
     {
         $jwk = $this->createJwk($filesystem, $dpopJwkFile);
 
@@ -210,21 +206,10 @@ class SolidClientFactory
         );
     }
 
-    private function createFileSystem($storageLocation): Filesystem
-    {
-        if ($storageLocation) {
-            $adapter = new LocalFilesystemAdapter($storageLocation);
-        } else {
-            $adapter = new InMemoryFilesystemAdapter();
-        }
-
-        return new Filesystem($adapter);
-    }
-
     private function createIssuerBuilder(
         HttpClient $httpClient,
+        Config $config,
         ?SimpleCache $cache,
-        int $metadataCacheTtlSeconds
     ): IssuerBuilder {
         $issuerBuilder = new IssuerBuilder();
         $jwksProviderBuilder = new JwksProviderBuilder();
@@ -234,7 +219,7 @@ class SolidClientFactory
         $issuerBuilder = $issuerBuilder->setMetadataProviderBuilder($metadataProviderBuilder);
 
         if ($cache instanceof CacheInterface) {
-            $metadataProviderBuilder->setCache($cache)->setCacheTtl($metadataCacheTtlSeconds);
+            $metadataProviderBuilder->setCache($cache)->setCacheTtl($config->get(Config::KEY_METADATA_CACHE_TTL));
             // Do not cache JWKS in this PoC:
             // the local dev OP can rotate keys between runs, which causes false
             // "Invalid token signature" failures when stale JWK sets are reused.
@@ -249,7 +234,7 @@ class SolidClientFactory
         return $issuerBuilder;
     }
 
-    private function createJwk(Filesystem $filesystem, string $dpopJwkFile): JWK
+    private function createJwk(FilesystemOperator $filesystem, string $dpopJwkFile): JWK
     {
         // RFC9449 - DPoP - Section 5.  DPoP Access Token Request
         // Initialise DPoP key pair — persisted to disk so the same key is reused across requests.
