@@ -10,6 +10,7 @@ class Config
     public const KEY_METADATA_CACHE_TTL = 'metadata_cache_ttl';
     public const KEY_SOLID_STORAGE_PATH = 'solid_storage_path';
 
+    private const ERROR_CONFIG_NOT_ARRAY = 'Provided config file must return an array.';
     private const ERROR_FILE_NOT_EXISTS = 'Provided config file "%s" does not exist.';
     private const ERROR_MISSING_REQUIRED_KEYS = 'Missing required config key(s): %s.';
     private const ERROR_UNKNOWN_KEY = 'Unknown config key "%s". Available keys are: %s.';
@@ -33,8 +34,13 @@ class Config
 
         $config = require $filePath;
 
-        return self::fromArray($config);
+        if (! is_array($config)) {
+            throw new \RuntimeException(self::ERROR_CONFIG_NOT_ARRAY);
+        } else {
+            return self::fromArray($config);
+        }
     }
+
     final public static function fromArray(array $config): self
     {
         $instance = new self();
