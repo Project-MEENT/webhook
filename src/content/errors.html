@@ -56,7 +56,7 @@
         padding-bottom: 0;
     }
 
-    nav a[href] {
+    header nav a[href] {
         border: 2px solid transparent;
         border-radius: var(--border-radius);
         margin: 0.15rem 0;
@@ -64,11 +64,45 @@
         text-decoration: none;
     }
 
-    nav a[href="#"]:not(.selected) {
+    header nav a[href]:hover {
         border-color: var(--color-link);
     }
 
-    nav a[href].selected {
+    /* CSS-only tab display */
+    #errors article {
+        display: none;
+    }
+
+    #errors article:target {
+        display: block;
+    }
+
+    /* Highlight nav link when its article is targeted */
+    html:has(#errors article#api-key-missing:target) header nav a[href="#api-key-missing"],
+    html:has(#errors article#data-conversion-error:target) header nav a[href="#data-conversion-error"],
+    html:has(#errors article#invalid-api-key:target) header nav a[href="#invalid-api-key"],
+    html:has(#errors article#invalid-api-version:target) header nav a[href="#invalid-api-version"],
+    html:has(#errors article#invalid-auth-header:target) header nav a[href="#invalid-auth-header"],
+    html:has(#errors article#invalid-json:target) header nav a[href="#invalid-json"],
+    html:has(#errors article#invalid-path:target) header nav a[href="#invalid-path"],
+    html:has(#errors article#invalid-timestamp:target) header nav a[href="#invalid-timestamp"],
+    html:has(#errors article#invalid-url:target) header nav a[href="#invalid-url"],
+    html:has(#errors article#method-not-allowed:target) header nav a[href="#method-not-allowed"],
+    html:has(#errors article#method-not-implemented:target) header nav a[href="#method-not-implemented"],
+    html:has(#errors article#missing-timestamp:target) header nav a[href="#missing-timestamp"],
+    html:has(#errors article#no-data-received:target) header nav a[href="#no-data-received"],
+    html:has(#errors article#no-storage-url:target) header nav a[href="#no-storage-url"],
+    html:has(#errors article#not-found:target) header nav a[href="#not-found"],
+    html:has(#errors article#provider-error:target) header nav a[href="#provider-error"],
+    html:has(#errors article#response-encoding-failed:target) header nav a[href="#response-encoding-failed"],
+    html:has(#errors article#solid-error:target) header nav a[href="#solid-error"],
+    html:has(#errors article#solid-fetch-error:target) header nav a[href="#solid-fetch-error"],
+    html:has(#errors article#solid-write-error:target) header nav a[href="#solid-write-error"],
+    html:has(#errors article#unexpected-error:target) header nav a[href="#unexpected-error"],
+    html:has(#errors article#unexpected-output:target) header nav a[href="#unexpected-output"],
+    html:has(#errors article#webid-already-registered:target) header nav a[href="#webid-already-registered"],
+    html:has(#errors article#webid-not-connected:target) header nav a[href="#webid-not-connected"],
+    html:has(#errors article#write-failed:target) header nav a[href="#write-failed"] {
         border-bottom-color: var(--color-secondary);
     }
 </style>
@@ -76,7 +110,6 @@
     <h1><title>Possible Errors</title></h1>
     <nav>
         <ul>
-            <li><a href="#">All Errors</a></li>
             <li><a href="#api-key-missing">API Key Missing</a></li>
             <li><a href="#data-conversion-error">Data Conversion Error</a></li>
             <li><a href="#invalid-api-key">Invalid API Key</a></li>
@@ -107,10 +140,6 @@
 </header>
 <main>
     <section id="errors">
-        <header>
-            <h2>/errors/</h2>
-        </header>
-
         <article id="api-key-missing">
             <header><h3 data-version="+v0.3">#api-key-missing</h3></header>
             <p>Returned when a request to a protected resource does not include an <code>Authorization: Bearer {api-key}</code> header.</p>
@@ -322,23 +351,4 @@
     </section>
 </main>
 
-<script>
-    const anchorElements = document.querySelectorAll('nav a[href]');
-    const articles = Array.from(document.querySelectorAll('#errors article[id]'))
-
-    function displaySelectedContent() {
-        const fragment = new URL(window.location.href).hash.substring(1)
-        const selectedArticle = document.querySelector(`#errors article[id="${fragment}"]`)
-
-        anchorElements.forEach(a => a.classList.remove('selected'))
-        document.querySelector('nav a[href="#' + fragment + '"]').classList.add('selected')
-
-        articles.forEach(article => {
-            article.hidden = Boolean(selectedArticle) && article.id !== fragment
-        })
-    }
-
-    window.addEventListener('hashchange', displaySelectedContent)
-    displaySelectedContent()
-</script>
 </html>
