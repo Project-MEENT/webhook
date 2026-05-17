@@ -3,7 +3,7 @@ const output = document.createElement('code')
 pre.appendChild(output)
 document.querySelector('output').insertAdjacentElement('afterbegin', pre)
 
-document.querySelectorAll('form').forEach(form => {
+document.querySelectorAll('form:not([data-js="consent-form"])').forEach(form => {
     form.addEventListener('submit', async (event) => {
         event.preventDefault()
 
@@ -13,14 +13,20 @@ document.querySelectorAll('form').forEach(form => {
         form.style.display = 'none'
         form.insertAdjacentHTML('afterend', '<a data-js="response-link" href="">\u2190 Try again</a>')
 
-        const isRegisterRequest = form.dataset.js === 'register-form'
-        const data = isRegisterRequest
-            ? form.querySelector('input[name="webid"]').value.trim()
-            : form.querySelector('textarea').value
+        let contentType = 'application/json'
+        let selectors = 'textarea'
+
+        if (form.dataset.js === 'register-form'){
+            contentType = 'text/plain'
+            selectors = 'input[name="webid"]'
+        }
+
+        const input = form.querySelector(selectors)
+        const data = input?.value?.trim() || ''
 
         const headers = {
             'Accept': 'application/json',
-            'Content-Type': isRegisterRequest ? 'text/plain' : 'application/json',
+            'Content-Type': contentType,
         }
 
         let apiKey
@@ -34,7 +40,8 @@ document.querySelectorAll('form').forEach(form => {
 
         let url = form.action || window.location.href
 
-        const version = form.querySelector('select[name="api-version"]').value
+        const versionSelect = form.querySelector('select[name="api-version"]')
+        const version = versionSelect?.value
         if (version) {
             url = url.replace(/\/api\/?/, `/api/${version}/`)
         }
