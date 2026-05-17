@@ -80,6 +80,7 @@
     /* Highlight nav link when its article is targeted */
     html:has(#errors article#api-key-missing:target) header nav a[href="#api-key-missing"],
     html:has(#errors article#data-conversion-error:target) header nav a[href="#data-conversion-error"],
+    html:has(#errors article#gateway-timeout:target) header nav a[href="#gateway-timeout"],
     html:has(#errors article#invalid-api-key:target) header nav a[href="#invalid-api-key"],
     html:has(#errors article#invalid-api-version:target) header nav a[href="#invalid-api-version"],
     html:has(#errors article#invalid-auth-header:target) header nav a[href="#invalid-auth-header"],
@@ -112,6 +113,7 @@
         <ul>
             <li><a href="#api-key-missing">API Key Missing</a></li>
             <li><a href="#data-conversion-error">Data Conversion Error</a></li>
+            <li><a href="#gateway-timeout">Gateway Timeout</a></li>
             <li><a href="#invalid-api-key">Invalid API Key</a></li>
             <li><a href="#invalid-api-version">Invalid API Version</a></li>
             <li><a href="#invalid-auth-header">Invalid Authorization Header</a></li>
@@ -248,6 +250,21 @@
             <p>Returned when a requested resource does not exist</p>
             <p><strong>Request:</strong> Any unknown or unsupported API route, or non-existing file in <code data-type="+v0.2">/data/</code></p>
             <p><strong>Response:</strong> 404 Not Found</p>
+        </article>
+
+        <article id="gateway-timeout">
+            <header><h3 data-version="+v0.4 latest">#gateway-timeout</h3></header>
+            <p>Returned when an upstream Solid Pod or identity provider does not respond within the allowed time.</p>
+            <p>Examples include:</p>
+            <ul>
+                <li>The Solid Pod's token endpoint timed out during authorization</li>
+                <li>The Solid Pod's resource endpoint timed out during a read or write</li>
+                <li>The identity provider did not respond in time during the redirect flow</li>
+            </ul>
+            <p><strong>Request:</strong> <code data-version="+v0.4 latest">GET
+                /api/v0.4/consent?code=...&state=...</code>, <code>GET /api/v0.4/data/{path}</code>, or <code>POST
+                /api/v0.4/data</code></p>
+            <p><strong>Response:</strong> 504 Gateway Timeout</p>
         </article>
 
         <article id="provider-error">
