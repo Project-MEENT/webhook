@@ -35,6 +35,9 @@ use Psr\SimpleCache\CacheInterface;
 
 class SolidClientFactory
 {
+    public const REQUIRE_NEW_AUTHENTICATION = false;
+    public const REUSE_STORED_AUTHENTICATION = true;
+
     private string $clientRedirectUri;
     private Config $config;
     private FilesystemOperator $filesystem;
@@ -46,7 +49,7 @@ class SolidClientFactory
         $this->filesystem = $filesystem;
     }
 
-    final public function create(): SolidClient
+    final public function create(bool $useOffline): SolidClient
     {
         $httpClientConfig = [
             // Allow self-signed certificates for local development
@@ -58,7 +61,6 @@ class SolidClientFactory
         $clientRedirectUri = $this->clientRedirectUri;
         $dpopJwkFile = 'dpop_jwk.json';
         $useCsrf = true;
-        $useOffline = true;
         $usePkce = true;
 
         $oidcClientConfig = $this->createClientConfig(
