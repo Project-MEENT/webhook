@@ -4,6 +4,8 @@ namespace Meent\WebHook\Solid;
 
 final class OidcClientConfig
 {
+    public const METADATA_FILE = 'client_metadata.json';
+
     private ?string $clientId;
     private string $clientName;
     private string $clientSecret;
@@ -15,7 +17,6 @@ final class OidcClientConfig
     final public function __construct(
         string $clientName,
         string $clientSecret,
-        string $configFile,
         string $redirectUri,
         array $redirectUris,
         ?string $clientId,
@@ -23,7 +24,6 @@ final class OidcClientConfig
         $this->clientId = $clientId;
         $this->clientName = $clientName;
         $this->clientSecret = $clientSecret;
-        $this->configFile = $configFile;
         $this->redirectUri = $redirectUri;
         $this->redirectUris = array_values($redirectUris);
     }
@@ -41,11 +41,6 @@ final class OidcClientConfig
     final public function clientSecret(): string
     {
         return $this->clientSecret;
-    }
-
-    final public function configFile(): string
-    {
-        return $this->configFile;
     }
 
     final public function redirectUri(): string

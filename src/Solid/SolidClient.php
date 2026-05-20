@@ -508,7 +508,7 @@ class SolidClient
         $filesystem = $this->filesystem;
 
         // @FIXME: The Oidc Client config file should be created before SolidClient instantiation
-        if (! $filesystem->fileExists($this->oidcConfig->configFile())) {
+        if (! $filesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
             // Client metadata file not found, creating...
             $data = [
                 'client_name' => $this->oidcConfig->clientName(),
@@ -528,7 +528,7 @@ class SolidClient
                 $data['scope'] = 'openid webid offline_access';
             }
 
-            $filesystem->write($this->oidcConfig->configFile(), json_encode($data,
+            $filesystem->write(OidcClientConfig::METADATA_FILE, json_encode($data,
                 JSON_PRETTY_PRINT
                 | JSON_THROW_ON_ERROR
                 | JSON_UNESCAPED_SLASHES // Don't escape slashes `/`.
@@ -536,7 +536,7 @@ class SolidClient
         }
 
         // Reading oidcClient metadata from file
-        $json = $filesystem->read($this->oidcConfig->configFile());
+        $json = $filesystem->read(OidcClientConfig::METADATA_FILE);
 
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }

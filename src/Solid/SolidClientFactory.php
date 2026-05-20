@@ -55,7 +55,6 @@ class SolidClientFactory
             // 'verify_peer' => false,
         ];
 
-        $clientConfigFile = 'client_metadata.json';
         $clientRedirectUri = $this->clientRedirectUri;
         $dpopJwkFile = 'dpop_jwk.json';
         $useCsrf = true;
@@ -64,7 +63,6 @@ class SolidClientFactory
 
         $oidcClientConfig = $this->createClientConfig(
             $this->filesystem,
-            $clientConfigFile,
             $this->config->get(Config::KEY_CLIENT_NAME),
             $clientRedirectUri,
         );
@@ -111,15 +109,14 @@ class SolidClientFactory
 
     final public function createClientConfig(
         FilesystemOperator $filesystem,
-        $clientConfigFile,
         string $defaultClientName,
         string $clientRedirectUri,
     ): OidcClientConfig {
         $clientConfig = [];
 
-        if ($filesystem->fileExists($clientConfigFile)) {
+        if ($filesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
             try {
-                $contents = json_decode($filesystem->read($clientConfigFile), true, 512, JSON_THROW_ON_ERROR);
+                $contents = json_decode($filesystem->read(OidcClientConfig::METADATA_FILE), true, 512, JSON_THROW_ON_ERROR);
                 if (is_array($contents)) {
                     $clientConfig = $contents;
                 }
@@ -142,7 +139,6 @@ class SolidClientFactory
         return new OidcClientConfig(
             clientName: $clientName,
             clientSecret: $clientSecret,
-            configFile: $clientConfigFile,
             redirectUri: $clientRedirectUri,
             redirectUris: $clientRedirectUris,
             clientId: is_string($clientId) ? $clientId : null,
