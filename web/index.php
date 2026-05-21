@@ -6,6 +6,9 @@ use Laminas\Diactoros\ServerRequestFactory;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\Local\LocalFilesystemAdapter;
+use Meent\WebHook\Controller\AdminController;
+use Meent\WebHook\Solid\OidcClientConfig;
+use Meent\WebHook\Solid\Session;
 use Meent\WebHook\Solid\SolidClientFactory;
 
 error_reporting(E_ALL);
@@ -30,11 +33,7 @@ $clientFilesystem = new Filesystem($clientFilesystemAdapter);
 // Create PSR Request and Response objects
 $request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
 
-$response = [
-    'headers' => [],
-    'status' => 200,
-    'title' => '',
-];
+$errorResponse = new ErrorResponse();
 
 $path = $request->getUri()->getPath();
 $pathParts = array_values(array_filter(explode('/', $path)));
@@ -79,33 +78,21 @@ switch ($rootPath) {
     case 'api':
         $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $clientRedirectUri);
-        $controller = new \Meent\WebHook\Controller\ApiController($dataFilesystem, $solidClientFactory);
+        $controller = new \Meent\WebHook\Controller\ApiController($dataFilesystem, $solidClientFactory, $errorResponse);
         try {
-            $response = $controller->handleRequest($request, $response);
+            $response = $controller->handleRequest($request);
         } catch (FilesystemException $exception) {
-            $response['content'] = [[
-                'detail' => 'Failed to write data: ' . $exception->getMessage(),
-                'pointer' => '#write-failed',
-            ]];
-            $response['status'] = 502;
-            $response['title'] = 'Failed to write data';
-            $response['type'] = '/errors/';
+            $response = $errorResponse->badGateway('Write Failed','Failed to write data: ' . $exception->getMessage());
         } catch (\Exception $exception) {
-            $response['content'] = [[
-                'detail' => 'An unexpected error occurred: ' . $exception->getMessage(),
-                'pointer' => '#unexpected-error',
-            ]];
-            $response['status'] = 500;
-            $response['title'] = 'Unexpected Error';
-            $response['type'] = '/errors/';
+            $response = $errorResponse->internalServerError('Unexpected Error','An unexpected error occurred: ' . $exception->getMessage());
         }
     break;
 
     case '':
     case 'docs':
     case 'errors':
-        $controller = new \Meent\WebHook\Controller\DocsController(new \League\CommonMark\GithubFlavoredMarkdownConverter());
-        $response = $controller->handleRequest($request, $response);
+        $controller = new \Meent\WebHook\Controller\DocsController(new \League\CommonMark\GithubFlavoredMarkdownConverter(), $errorResponse);
+        $response = $controller->handleRequest($request);
     break;
 
     default:
@@ -126,13 +113,7 @@ if ($output) {
         $output = urldecode($output);
     }
 
-    $response['content'] = [[
-        'detail' => 'The response caused unexpected output: ' . $output,
-        'pointer' => '#unexpected-output',
-    ]];
-    $response['status'] = 500;
-    $response['title'] = 'Unexpected Output';
-    $response['type'] = '/errors/';
+    $response = $errorResponse->internalServerError('Unexpected Output','The response caused unexpected output: ' . $output);
 }
 
 $content = $response['content'] ?? null;
@@ -142,8 +123,8 @@ if ($outputType === 'html') {
         $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
     }
 
-    if (is_array($content) || $response['title'] !== '') {
-        if ($response['type'] === '/errors/') {
+    if (is_array($content) || ! empty($response['title'])) {
+        if (isset($response['type']) && $response['type'] === '/errors/') {
             $body = '<ul>';
             foreach ($content as $error) {
                 $body .= vsprintf('<li><strong>%s</strong>: %s</li>', [
@@ -212,6 +193,10 @@ JSON;
 }
 
 http_response_code($response['status']);
+
+if (! isset($response['headers']) || ! is_array($response['headers'])) {
+    $response['headers'] = [];
+}
 
 array_walk($response['headers'], static function ($values, $name) {
     array_walk($values, static function ($value) use ($name) {

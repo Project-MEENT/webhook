@@ -2,6 +2,7 @@
 
 namespace Meent\WebHook\Controller;
 
+use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception\RuntimeException;
 use Psr\Http\Message\RequestInterface;
 
@@ -17,7 +18,9 @@ abstract class AbstractController
         'title' => '',
     ];
 
-    abstract public function handleRequest(RequestInterface $request, array $response);
+    protected ErrorResponse $errorResponse;
+
+    abstract public function handleRequest(RequestInterface $request);
 
     protected function getContents(string $subject)
     {
@@ -32,67 +35,33 @@ abstract class AbstractController
         return $contents;
     }
 
-    final protected function handleAllowedHttpMethods($response, $allowedMethods)
+    final protected function handleAllowedHttpMethods($allowedMethods)
     {
         natcasesort($allowedMethods);
 
         $methods = implode(', ', $allowedMethods);
-        $response['headers']['Allow'] = [$methods];
-        $response['headers']['Access-Control-Allow-Methods'] = [$methods];
-        $response['status'] = 204;
 
-        return $response;
+        return [
+            'headers' => ['Allow' => [$methods], 'Access-Control-Allow-Methods' => [$methods]],
+            'status' => 204,
+        ];
     }
 
-    final protected function handleMethodNotAllowed($response, $request, $allowedMethods)
+    final protected function handleMethodNotAllowed($request, $allowedMethods)
     {
         $requestMethod = $request->getMethod();
 
-        $response['content'] = [
-            [
-                'detail' => "Method $requestMethod is not allowed, MUST be "
-                    . (count($allowedMethods) > 1 ? 'one of ' : '')
-                    . implode(', ', $allowedMethods),
-                'pointer' => '#method-not-allowed',
-            ]
-        ];
-        $response['status'] = 405;
-        $response['title'] = 'Method not allowed';
-        $response['type'] = '/errors/';
-
-        return $response;
+        return $this->errorResponse->methodNotAllowed('Method not allowed',"Method $requestMethod is not allowed, MUST be "
+            . (count($allowedMethods) > 1 ? 'one of ' : '')
+            . implode(', ', $allowedMethods),
+        );
     }
 
-    final protected function handleMethodNotImplemented($response, RequestInterface $request, array $allowedMethods)
-    {
-        $response['content'] = [[
-            'detail' => "Method '{$request->getMethod()}' is not implemented, MUST be"
-                . (count($allowedMethods) > 1 ? 'one of ' : '')
-                . implode(', ', $allowedMethods),
-            'pointer' => '#method-not-implemented',
-        ]];
-        $response['status'] = 501;
-        $response['title'] = 'Method Not Implemented';
-        $response['type'] = '/errors/';
-
-        return $response;
-    }
-
-    final protected function handleNotFound(RequestInterface $request, array $response)
+    final protected function handleNotFound(RequestInterface $request)
     {
         $requestUri = $request->getUri()->getPath();
 
-        $response['content'] = [
-            [
-                'detail' => "The requested resource '$requestUri' was not found on this server.",
-                'pointer' => '#not-found',
-            ]
-        ];
-        $response['status'] = 404;
-        $response['title'] = 'Not found';
-        $response['type'] = '/errors/';
-
-        return $response;
+        return $this->errorResponse->notFound('Not found',"The requested resource '$requestUri' was not found on this server.");
     }
 
     final protected function splitUriPath(RequestInterface $request): array

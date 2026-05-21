@@ -3,6 +3,7 @@
 namespace Meent\WebHook\Controller;
 
 use League\CommonMark\ConverterInterface;
+use Meent\WebHook\ErrorResponse;
 use Psr\Http\Message\RequestInterface;
 
 class DocsController extends AbstractController
@@ -12,30 +13,27 @@ class DocsController extends AbstractController
 
     private ConverterInterface $converter;
 
-    public function __construct(ConverterInterface $converter)
+    final public function __construct(ConverterInterface $converter, ErrorResponse $errorResponse)
     {
         $this->converter = $converter;
+        $this->errorResponse = $errorResponse;
     }
 
-    final public function handleRequest(RequestInterface $request, array $response)
+    final public function handleRequest(RequestInterface $request)
     {
         $converter = $this->converter;
 
         $acceptHeader = $request->getHeaderLine('Accept');
-
-        $response['type'] = '/docs/';
-        $response['content'] = [];
 
         $subject = $this->getRequestedSubject($request);
 
         switch ($subject) {
             case self::SUBJECT_ROOT:
                 $fileContent = file_get_contents(__DIR__ . '/../../README.md');
-                $markdown = $this->parseMarkdown($fileContent, $response);
+                $markdown = $this->parseMarkdown($fileContent);
 
                 if (str_contains($acceptHeader, 'application/json')) {
-                    $response['content'] = $fileContent;
-                    $response['title'] = $markdown['title'];
+                    $response = ['content' => $fileContent, 'status' => 200, 'title' => $markdown['title']];
                 } else {
                     $content = [
                         'header' => $converter->convert($markdown['description']),
@@ -45,22 +43,23 @@ class DocsController extends AbstractController
 
                     $content = array_merge(self::EMPTY_CONTENT, $content);
                     $template = $this->getContents('template');
-                    $response['content'] = vsprintf($template, $content);
-
-                    $response['title'] = '';
+                    $response = ['content' => vsprintf($template, $content), 'status' => 200, 'title' => ''];
                 }
-                break;
+            break;
 
             case self::SUBJECT_CONTENT:
                 $fileContent = file_get_contents(__DIR__ . '/../../docs/usage.md');
-                $markdown = $this->parseMarkdown($fileContent, $response);
+                $markdown = $this->parseMarkdown($fileContent);
 
                 if (str_contains($acceptHeader, 'application/json')) {
-                    $response['content'] = [
-                        'markdown' => $fileContent,
-                        'html' => $converter->convert($fileContent)->getContent(),
+                    $response = [
+                        'content' => [
+                            'html' => $converter->convert($fileContent)->getContent(),
+                            'markdown' => $fileContent,
+                        ],
+                        'status' => 200,
+                        'title' => $markdown['title'],
                     ];
-                    $response['title'] = $markdown['title'];
                 } else {
                     $content = [
                         'header' => $converter->convert($markdown['description']),
@@ -70,34 +69,38 @@ class DocsController extends AbstractController
 
                     $content = array_merge(self::EMPTY_CONTENT, $content);
                     $template = $this->getContents('template');
-                    $response['content'] = vsprintf($template, $content);
-
-                    $response['title'] = '';
+                    $response = ['content' => vsprintf($template, $content), 'status' => 200, 'title' => ''];
                 }
             break;
 
             case self::SUBJECT_ERROR:
                 if (str_contains($acceptHeader, 'application/json')) {
-                    $response['title'] = 'Errors';
+                    $response = ['status' => 200, 'title' => 'Errors'];
                 } else {
                     $contents = $this->getContents($subject);
-                    $response['content'] = $contents;
+                    $response = ['content' => $contents, 'status' => 200];
                 }
             break;
 
             default:
-                $response = $this->handleNotFound($request, $response);
+                $response = $this->handleNotFound($request);
             break;
+        }
+
+        if (! isset($response['type'])) {
+            $response['type'] = '/docs/';
         }
 
         return $response;
     }
 
-    private function parseMarkdown($markdown, $response)
+    private function parseMarkdown($markdown)
     {
-        $response['content'] = '';
-        $response['description'] = '';
-        $response['title'] = '';
+        $response = ['content' => '', 'description' => '', 'title' => ''];
+
+        $replace = [
+            './docs/usage.md' => '/docs/',
+        ];
 
         $lines = explode("\n", $markdown);
 
@@ -107,15 +110,9 @@ class DocsController extends AbstractController
             } elseif ($response['content'] === '' && ! str_starts_with($line, '## ')) {
                 $response['description'] .= $line . "\n";
             } else {
-                $response['content'] .= $line . "\n";
+                $response['content'] .= str_replace(array_keys($replace), $replace, $line) . "\n";
             }
         }
-
-        $replace =[
-            './docs/usage.md' => '/docs/',
-        ];
-
-        $response['content'] = str_replace(array_keys($replace), $replace, $response['content']);
 
         return $response;
     }
