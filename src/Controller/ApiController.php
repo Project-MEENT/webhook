@@ -615,10 +615,11 @@ class ApiController extends AbstractController
                     if ($version >= 0.4) {
                         $webIdUrl = $queryParams['webid'] ?? '';
 
+                        $replace = [
+                            '{webid}' => $webIdUrl,
+                        ];
                         $formContents = file_get_contents(__DIR__ . '/../content/forms/register.html');
-                        $form = vsprintf($formContents, [
-                            'webId' => $webIdUrl,
-                        ]);
+                        $form = str_replace(array_keys($replace), $replace, $formContents);
 
                         $content = [
                             'header' => '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
