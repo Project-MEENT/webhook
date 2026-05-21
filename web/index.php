@@ -141,9 +141,9 @@ if ($outputType === 'html') {
         $template = file_get_contents(__DIR__ . '/../src/content/template.html');
 
         $content = vsprintf($template, [
-            'footer' => '<p>'.$response['type'] ?? $request->getUri()->getPath().'</p>',
+            'footer' => '<p>' . ($response['type'] ?? '/' . $request->getUri()->getPath() . '/') . '</p>',
             'header' => 'Webhook to write data from a P1 dongle to a Solid Pod.',
-            'main' => '<section><h2>' . ($response['title'] ?? 'Response') . '</h2>' . $body. '</section>',
+            'main' => '<section><h2>' . ($response['title'] ?? 'Response') . '</h2>' . $body . '</section>',
             'script' => '',
             'style' => 'h2 {width: 100%;}',
             'title' => 'MEENT Solid P1 Dongle Webhook',
