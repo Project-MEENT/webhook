@@ -24,6 +24,8 @@ class SolidClient
 {
     use UrlHashTrait;
 
+    public const ISSUER_METADATA_FILE = 'issuer_metadata.json';
+
     private AuthorizationService $authorizationService;
     private HttpClient $httpClient;
     private ClientBuilder $oidcClientBuilder;
@@ -413,7 +415,7 @@ class SolidClient
         $issuerUrl = $issuerConfig['issuer'];
         $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
 
-        return $issuerHash . '/issuer_metadata.json';
+        return $issuerHash . '/' . self::ISSUER_METADATA_FILE;
     }
 
     private function getGrantFilePath(IssuerInterface $issuer, $webIdUrl)

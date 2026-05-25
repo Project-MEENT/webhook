@@ -6,6 +6,7 @@ use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Solid\Session;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
+use Meent\WebHook\WebIdInformation;
 use Psr\Http\Message\RequestInterface;
 
 class AdminController extends AbstractController
@@ -23,17 +24,20 @@ class AdminController extends AbstractController
     private array $adminWebIds;
     private Session $session;
     private SolidClient $solidClient;
+    private WebIdInformation $webIdInformation;
 
     final public function __construct(
         SolidClient $solidClient,
         Session $session,
+        WebIdInformation $webIdInformation,
         array $adminWebIds,
-        ErrorResponse $errorResponse
+        ErrorResponse $errorResponse,
     ) {
         $this->adminWebIds = array_map([$this, 'normalizeUrl'], $adminWebIds);
         $this->errorResponse = $errorResponse;
         $this->session = $session;
         $this->solidClient = $solidClient;
+        $this->webIdInformation = $webIdInformation;
     }
 
     final public function handleRequest(RequestInterface $request)
@@ -93,10 +97,17 @@ class AdminController extends AbstractController
                                     $logoutForm = $this->addCsrfToForm($logoutForm);
                                     $logoutForm = str_replace(['{webid}'], [$webId], $logoutForm);
 
+                                    $webIds = $this->webIdInformation->getAll();
+                                    if ($webIds === []) {
+                                        $WebIdsHtml = '<p><em>No WebIDs found.</em></p>';
+                                    } else {
+                                        $WebIdsHtml = $this->createInfoTable($webIds);
+                                    }
+
                                     $content = $this->createContent(
                                         'Admin dashboard',
                                         $logoutForm,
-                                        '<section></section>',
+                                        "<section>$WebIdsHtml</section>",
                                     );
 
                                     $response = [
@@ -198,6 +209,47 @@ class AdminController extends AbstractController
             '<input name="csrf" type="hidden" value="' . $csrfToken .'" /></form>',
             $formContents,
         );
+    }
+
+    private function createInfoTable(array $webIds): string
+    {
+        $template = file_get_contents(__DIR__ . '/../content/webid-table-row.html');
+
+        $webIdsInfo = array_map(function ($info) use ($template) {
+            return vsprintf($template, [
+                $info['webid'],
+                $this->hashUrl($info['webid'], 'sha1'),
+                in_array($info['webid'], $this->adminWebIds, true)
+                    ? 'checked '
+                    : '',
+                $info['has_consent']
+                    ? 'checked '
+                    : '',
+                $info['api_key']
+                    ? 'checked '
+                    : '',
+                $info['api_key'],
+            ]);
+        }, $webIds);
+
+        $implode = implode('', $webIdsInfo);
+
+        $WebIdsHtml = <<<"HTML"
+            <table class="webid-info">
+                <thead>
+                <tr>
+                    <th>WebID</th>
+                    <th>Admin<br/>Account</th>
+                    <th>Consent<br/>Given</th>
+                    <th>Dongle<br/>Registered</th>
+                    <th>API Key</th>
+                </tr>
+                </thead>
+                <tbody>$implode</tbody>
+            </table>
+HTML;
+
+        return $WebIdsHtml;
     }
 
     private function isValidCsrfToken(RequestInterface $request): bool

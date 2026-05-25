@@ -35,6 +35,7 @@ use Psr\SimpleCache\CacheInterface;
 
 class SolidClientFactory
 {
+    public const DPOP_JWK_FILE = 'dpop_jwk.json';
     public const REQUIRE_NEW_AUTHENTICATION = false;
     public const REUSE_STORED_AUTHENTICATION = true;
 
@@ -59,7 +60,7 @@ class SolidClientFactory
         ];
 
         $clientRedirectUri = $this->clientRedirectUri;
-        $dpopJwkFile = 'dpop_jwk.json';
+        $dpopJwkFile = self::DPOP_JWK_FILE;
         $useCsrf = true;
         $usePkce = true;
 

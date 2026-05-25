@@ -92,10 +92,12 @@ switch ($rootPath) {
         $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $clientRedirectUri);
         $solidClient = $solidClientFactory->create(SolidClientFactory::REQUIRE_NEW_AUTHENTICATION);
+        $webIdInformationService = new WebIdInformation($clientFilesystem, $dataFilesystem);
 
         $controller = new AdminController(
             $solidClient,
             Session::current(),
+            $webIdInformationService,
             $config->get(Config::KEY_ADMIN_WEBIDS),
             $errorResponse
         );
