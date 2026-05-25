@@ -9,3 +9,15 @@ header ol {
 main h2 {
     width: 100%;
 }
+
+
+form[action$="logout"] {
+    margin: 0 auto;
+    padding: 0.15rem 1rem;
+    width: fit-content;
+}
+
+form[action$="logout"] button {
+    margin-left: 1rem;
+    padding: 0.15rem;
+}

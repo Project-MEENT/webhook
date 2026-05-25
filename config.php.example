@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'admin_webids' => [
+        'https://id-0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d.solid-01.muze.nl/#me',
+    ],
     'api_storage_path' => __DIR__ . '/build/data',
     'client_name' => 'MEENT Solid P1 Dongle Webhook',
     'jwt_ttl' => 300, // 5 minutes in seconds

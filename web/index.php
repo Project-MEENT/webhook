@@ -88,6 +88,21 @@ switch ($rootPath) {
         }
     break;
 
+    case 'admin':
+        $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
+        $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $clientRedirectUri);
+        $solidClient = $solidClientFactory->create(SolidClientFactory::REQUIRE_NEW_AUTHENTICATION);
+
+        $controller = new AdminController(
+            $solidClient,
+            Session::current(),
+            $config->get(Config::KEY_ADMIN_WEBIDS),
+            $errorResponse
+        );
+
+        $response = $controller->handleRequest($request);
+    break;
+
     case '':
     case 'docs':
     case 'errors':

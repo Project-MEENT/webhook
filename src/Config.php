@@ -4,6 +4,7 @@ namespace Meent\WebHook;
 
 class Config
 {
+    public const KEY_ADMIN_WEBIDS = 'admin_webids';
     public const KEY_API_STORAGE_PATH = 'api_storage_path';
     public const KEY_CLIENT_NAME = 'client_name';
     public const KEY_JWT_TTL = 'jwt_ttl';
@@ -18,6 +19,7 @@ class Config
     private array $config = [];
 
     private $requiredKeys = [
+        self::KEY_ADMIN_WEBIDS => 'List of allowed admin WebID URLs',
         self::KEY_API_STORAGE_PATH => 'Used for persistent storage of data posted to the API',
         self::KEY_CLIENT_NAME => 'MEENT Solid P1 Dongle Webhook',
         self::KEY_JWT_TTL => 'Expiration time of OAuth state JWTs, in seconds.',
