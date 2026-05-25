@@ -35,15 +35,12 @@ class DocsController extends AbstractController
                 if (str_contains($acceptHeader, 'application/json')) {
                     $response = ['content' => $fileContent, 'status' => 200, 'title' => $markdown['title']];
                 } else {
-                    $content = [
-                        'header' => $converter->convert($markdown['description']),
-                        'main' => '<section>' . $converter->convert($markdown['content']) . '</section>',
-                        'title' => $markdown['title'],
-                    ];
-
-                    $content = array_merge(self::EMPTY_CONTENT, $content);
-                    $template = $this->getContents('template');
-                    $response = ['content' => vsprintf($template, $content), 'status' => 200, 'title' => ''];
+                    $content = $this->createContent(
+                        $markdown['title'],
+                        $converter->convert($markdown['description']),
+                        '<section>' . $converter->convert($markdown['content']) . '</section>',
+                    );
+                    $response = ['content' => $content, 'status' => 200, 'title' => ''];
                 }
             break;
 
@@ -61,15 +58,12 @@ class DocsController extends AbstractController
                         'title' => $markdown['title'],
                     ];
                 } else {
-                    $content = [
-                        'header' => $converter->convert($markdown['description']),
-                        'main' => '<section>' . $converter->convert($markdown['content']) . '</section>',
-                        'title' => $markdown['title'],
-                    ];
-
-                    $content = array_merge(self::EMPTY_CONTENT, $content);
-                    $template = $this->getContents('template');
-                    $response = ['content' => vsprintf($template, $content), 'status' => 200, 'title' => ''];
+                    $content = $this->createContent(
+                        $markdown['title'],
+                        $converter->convert($markdown['description']),
+                        '<section>' . $converter->convert($markdown['content']) . '</section>',
+                    );
+                    $response = ['content' => $content, 'status' => 200, 'title' => ''];
                 }
             break;
 

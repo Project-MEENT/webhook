@@ -22,7 +22,28 @@ abstract class AbstractController
 
     abstract public function handleRequest(RequestInterface $request);
 
-    protected function getContents(string $subject)
+    final protected function createContent(string $title, string $description, string $body = '', string $script = ''): string
+    {
+        $context = array_merge(AbstractController::EMPTY_CONTENT, [
+            'header' => $description,
+            'main' => $body,
+            'title' => $title,
+        ]);
+
+        if( ! empty($script)) {
+            $path = __DIR__ . '/../content/' . $script;
+            if (! file_exists($path)) {
+                throw new RuntimeException('Script file not found: ' . $path);
+            }
+            $context['script'] = file_get_contents($path);
+        }
+
+        $template = $this->getContents('template');
+
+        return vsprintf($template, $context);
+    }
+
+    final protected function getContents(string $subject)
     {
         $contentPath = __DIR__ . '/../content/' . $subject . '.html';
 

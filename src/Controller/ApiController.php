@@ -222,15 +222,19 @@ class ApiController extends AbstractController
                 } elseif (! $webIdUrl) {
                     $form = file_get_contents(__DIR__ . '/../content/forms/consent.html');
 
-                    $content['header'] = '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>';
-                    $content['main'] = "<section>$form</section><section><output></output></section>";
-                    $content['script'] = file_get_contents(__DIR__ . '/../content/forms/form.js');
-                    $content['title'] = 'Provide consent';
+                    $content = $this->createContent(
+                        'Provide consent',
+                        '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
+                        "<section>$form</section><section><output></output></section>",
+                        'forms/form.js',
+                    );
                 } elseif (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
                     $response = $this->errorResponse->unprocessableEntity('Invalid URL',"Provided WebID '$webIdUrl' is not a valid URL");
                 } elseif ($webIdConnected || $solidClient->isWebIdConnected($webIdUrl)) {
-                    $content['header'] = "<p>Your P1 dongle can now be connected to your Solid Pod, using WebID <a href='$webIdUrl'>$webIdUrl</a></p>";
-                    $content['title'] = 'Consent Provided';
+                    $content = $this->createContent(
+                        'Consent Provided',
+                        "<p>Your P1 dongle can now be connected to your Solid Pod, using WebID <a href='$webIdUrl'>$webIdUrl</a></p>",
+                    );
                 } else {
                     $redirectUri = $solidClient->connectWebId($webIdUrl, Session::current());
                 }
@@ -243,9 +247,7 @@ class ApiController extends AbstractController
                     ];
 
                 } elseif (isset($content)) {
-                    $content = array_merge(self::EMPTY_CONTENT, $content);
-                    $template = $this->getContents('template');
-                    $response = ['content' => vsprintf($template, $content), 'status' => 200];
+                    $response = ['content' => $content, 'status' => 200];
                 }
             break;
 
@@ -306,19 +308,16 @@ class ApiController extends AbstractController
         $queryParams = $request->getQueryParams();
 
         if ($version >= 0.4 && ! $request->getHeaderLine('Authorization')) {
-            $template = $this->getContents('template');
             $form = file_get_contents(__DIR__ . '/../content/forms/data.html');
 
-            $content = [
-                'header' => '<p>To write data to a Solid Pod, please provide authentication and data</p>',
-                'main' => "<section>$form</section><section><output></output></section>",
-                'script' => file_get_contents(__DIR__ . '/../content/forms/form.js'),
-                'title' => 'Post content',
-            ];
+            $content = $this->createContent(
+                'Post content',
+                '<p>To write data to a Solid Pod, please provide authentication and data</p>',
+                "<section>$form</section><section><output></output></section>",
+                'forms/form.js',
+            );
 
-            $content = array_merge(self::EMPTY_CONTENT, $content);
-            $template = $this->getContents('template');
-            $response = ['content' => vsprintf($template, $content), 'status' => 200];
+            $response = ['content' => $content, 'status' => 200];
 
             return $response;
         }
@@ -621,16 +620,14 @@ class ApiController extends AbstractController
                         $formContents = file_get_contents(__DIR__ . '/../content/forms/register.html');
                         $form = str_replace(array_keys($replace), $replace, $formContents);
 
-                        $content = [
-                            'header' => '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
-                            'main' => "<section>$form</section><section><output></output></section>",
-                            'script' => file_get_contents(__DIR__ . '/../content/forms/form.js'),
-                            'title' => 'Provide consent',
-                        ];
+                        $content = $this->createContent(
+                            'Provide consent',
+                            '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
+                            "<section>$form</section><section><output></output></section>",
+                            'forms/form.js',
+                        );
 
-                        $content = array_merge(self::EMPTY_CONTENT, $content);
-                        $template = $this->getContents('template');
-                        $response = ['content' => vsprintf($template, $content), 'status' => 200];
+                        $response = ['content' => $content, 'status' => 200];
                     } else {
                         $response = $this->handleMethodNotAllowed($request, $allowedMethods);
                     }
