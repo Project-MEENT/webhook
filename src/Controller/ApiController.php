@@ -9,7 +9,7 @@ use Meent\WebHook\Exception;
 use Meent\WebHook\Exception\SolidException;
 use Meent\WebHook\Record;
 use Meent\WebHook\Solid\Session;
-use Meent\WebHook\Solid\SolidClientFactory;
+use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
 use Psr\Http\Message\RequestInterface;
 
@@ -35,16 +35,16 @@ class ApiController extends AbstractController
     private const SUBJECT_REGISTER = 'register';
 
     private FilesystemOperator $filesystem;
-    private SolidClientFactory $solidClientFactory;
+    private SolidClient $solidClient;
 
     final public function __construct(
         FilesystemOperator $filesystem,
-        SolidClientFactory $solidClientFactory,
+        SolidClient $solidClient,
         ErrorResponse $errorResponse
     ) {
         $this->errorResponse = $errorResponse;
         $this->filesystem = $filesystem;
-        $this->solidClientFactory = $solidClientFactory;
+        $this->solidClient = $solidClient;
     }
 
     final public function handleRequest(RequestInterface $request)
@@ -212,12 +212,10 @@ class ApiController extends AbstractController
                     ?? $queryParams['connected']
                     ?? null;
 
-                $solidClient = $this->solidClientFactory->create(SolidClientFactory::REUSE_STORED_AUTHENTICATION);
-
                 if (isset($queryParams['error'])) {
                     $response = $this->errorResponse->badGateway('Provider Error','The Provider returned an error: "' . urldecode($queryParams['error']) . '"');
                 } elseif ($isRedirect) {
-                    $webIdUrl = $solidClient->handleRedirect($queryParams, Session::current());
+                    $webIdUrl = $this->solidClient->handleRedirect($queryParams, Session::current());
                     $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
                 } elseif (! $webIdUrl) {
                     $form = file_get_contents(__DIR__ . '/../content/forms/consent.html');
@@ -230,13 +228,13 @@ class ApiController extends AbstractController
                     );
                 } elseif (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
                     $response = $this->errorResponse->unprocessableEntity('Invalid URL',"Provided WebID '$webIdUrl' is not a valid URL");
-                } elseif ($webIdConnected || $solidClient->isWebIdConnected($webIdUrl)) {
+                } elseif ($webIdConnected || $this->solidClient->isWebIdConnected($webIdUrl)) {
                     $content = $this->createContent(
                         'Consent Provided',
                         "<p>Your P1 dongle can now be connected to your Solid Pod, using WebID <a href='$webIdUrl'>$webIdUrl</a></p>",
                     );
                 } else {
-                    $redirectUri = $solidClient->connectWebId($webIdUrl, Session::current());
+                    $redirectUri = $this->solidClient->connectWebId($webIdUrl, Session::current());
                 }
 
                 // Create Response
@@ -338,9 +336,8 @@ class ApiController extends AbstractController
         if (isset($apiKey)) {
             $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
 
-            $solidClient = $this->solidClientFactory->create(SolidClientFactory::REUSE_STORED_AUTHENTICATION);
 
-            $storageUrls = $solidClient->fetchStorageUrls($webId);
+            $storageUrls = $this->solidClient->fetchStorageUrls($webId);
 
             if ($storageUrls !== []) {
                 // @TODO: Instead of using the first URL, the user should be asked which one to use when registering
@@ -358,7 +355,7 @@ class ApiController extends AbstractController
             ]);
 
             try {
-                $solidResponse = $solidClient->fetchResource($webId, $resourceUrl);
+                $solidResponse = $this->solidClient->fetchResource($webId, $resourceUrl);
             } catch (SolidException $e) {
                 return $this->errorResponse->badGateway('Error fetching resource from Solid Pod','Error fetching resource from Solid Pod: ' . $e->getMessage(), '#solid-fetch-error');
             }
@@ -463,11 +460,9 @@ class ApiController extends AbstractController
                         $dateTime->setTimezone(new \DateTimeZone('Europe/Amsterdam'));
                         $timestamp = $dateTime->format('Ymd.His');
 
-                        $solidClient = $this->solidClientFactory->create(SolidClientFactory::REUSE_STORED_AUTHENTICATION);
-
                         // @FIXME: Read StorageUrl from persistent configuration instead of resolving it on every request.
                         if (empty($storageUrl)) {
-                            $storageUrls = $solidClient->fetchStorageUrls($webId);
+                            $storageUrls = $this->solidClient->fetchStorageUrls($webId);
 
                             if ($storageUrls !== []) {
                                 // @KLUDGE: As there is no user available here, we cannot ask them which storage to use
@@ -501,7 +496,7 @@ class ApiController extends AbstractController
                         }
 
                         try {
-                            $result = $solidClient->storeResource($webId, $url, $turtle, 'text/turtle');
+                            $result = $this->solidClient->storeResource($webId, $url, $turtle, 'text/turtle');
                         } catch (SolidException $e) {
                             return $this->errorResponse->badGateway('Solid write error','Could not write resource to Solid Pod: ' . $e->getMessage());
                         }
@@ -569,8 +564,7 @@ class ApiController extends AbstractController
 
                 $isConnected = true;
                 if ($version >= 0.4) {
-                    $solidClient = $this->solidClientFactory->create(SolidClientFactory::REUSE_STORED_AUTHENTICATION);
-                    $isConnected = $solidClient->isWebIdConnected($webId);
+                    $isConnected = $this->solidClient->isWebIdConnected($webId);
 
                     if (! $isConnected) {
                         $connectionUrl = $request->getUri()->withPath('/api/consent')->withQuery('webid=' . urlencode($webId));

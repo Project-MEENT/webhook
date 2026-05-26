@@ -7,6 +7,7 @@ use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use Meent\WebHook\Controller\AdminController;
+use Meent\WebHook\Controller\ApiController;
 use Meent\WebHook\Solid\OidcClientConfig;
 use Meent\WebHook\Solid\Session;
 use Meent\WebHook\Solid\SolidClientFactory;
@@ -78,7 +79,9 @@ switch ($rootPath) {
     case 'api':
         $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $clientRedirectUri);
-        $controller = new \Meent\WebHook\Controller\ApiController($dataFilesystem, $solidClientFactory, $errorResponse);
+        $solidClient = $solidClientFactory->create(SolidClientFactory::REUSE_STORED_AUTHENTICATION);
+
+        $controller = new ApiController($dataFilesystem, $solidClient, $errorResponse);
         try {
             $response = $controller->handleRequest($request);
         } catch (FilesystemException $exception) {
