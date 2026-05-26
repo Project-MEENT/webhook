@@ -793,7 +793,7 @@ class SolidClient
         // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
         try {
             // @TODO: If the issuer requires pre-registration, an initial access token (provided during registration on the oidcClient) can be provided here.
-            return $this->registration->register($issuer, $clientConfig);
+            return $this->registration->register($issuer, $clientConfig, $this->oidcConfig->initialAccessToken());
         } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
             // InvalidArgumentException(Issuer does not support dynamic oidcClient registration)
             // RuntimeException(Unable to encode oidcClient metadata | Unable to register OpenID oidcClient | Registration response did not return a client_id field)

@@ -6,6 +6,7 @@ class Config
 {
     public const KEY_ADMIN_WEBIDS = 'admin_webids';
     public const KEY_API_STORAGE_PATH = 'api_storage_path';
+    public const KEY_INITIAL_ACCESS_TOKEN = 'client_initial_access_token';
     public const KEY_CLIENT_NAME = 'client_name';
     public const KEY_JWT_TTL = 'jwt_ttl';
     public const KEY_METADATA_CACHE_TTL = 'metadata_cache_ttl';
@@ -17,6 +18,10 @@ class Config
     private const ERROR_UNKNOWN_KEY = 'Unknown config key "%s". Available keys are: %s.';
 
     private array $config = [];
+
+    private $optionalKeys = [
+        self::KEY_INITIAL_ACCESS_TOKEN => 'Initial Access Token for dynamic client registration (optional, only needed if the OP requires it)',
+    ];
 
     private $requiredKeys = [
         self::KEY_ADMIN_WEBIDS => 'List of allowed admin WebID URLs',
@@ -56,12 +61,15 @@ class Config
 
     public function get(string $key)
     {
-        $availableKeys = array_keys($this->requiredKeys);
+        $availableKeys = array_merge(
+            array_keys($this->requiredKeys),
+            array_keys($this->optionalKeys),
+        );
 
-        if (!in_array($key, $availableKeys)) {
+        if (! in_array($key, $availableKeys, true)) {
             $message = vsprintf(self::ERROR_UNKNOWN_KEY, [
                 $key,
-                implode(', ', $availableKeys)
+                implode(', ', $availableKeys),
             ]);
 
             throw new \RuntimeException($message);
@@ -74,14 +82,14 @@ class Config
     {
         $missingKeys = array_diff(array_keys($this->requiredKeys), array_keys($config));
 
-        if (!empty($missingKeys)) {
+        if (! empty($missingKeys)) {
             $keys = [];
             foreach ($missingKeys as $missingKey) {
                 $keys[] = sprintf("%s (%s)", $missingKey, $this->requiredKeys[$missingKey]);
             }
 
-            $message = vsprintf(self::ERROR_MISSING_REQUIRED_KEYS,[
-                implode(', ', $keys)
+            $message = vsprintf(self::ERROR_MISSING_REQUIRED_KEYS, [
+                implode(', ', $keys),
             ]);
 
             throw new \RuntimeException($message);

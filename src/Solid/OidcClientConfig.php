@@ -10,7 +10,9 @@ final class OidcClientConfig
     private string $clientName;
     private string $clientSecret;
     private string $configFile;
+    private ?string $initialAccessToken;
     private string $redirectUri;
+
     /** @var string[] */
     private array $redirectUris;
 
@@ -20,12 +22,14 @@ final class OidcClientConfig
         string $redirectUri,
         array $redirectUris,
         ?string $clientId,
+        ?string $initialAccessToken = null,
     ) {
         $this->clientId = $clientId;
         $this->clientName = $clientName;
         $this->clientSecret = $clientSecret;
         $this->redirectUri = $redirectUri;
         $this->redirectUris = array_values($redirectUris);
+        $this->initialAccessToken = $initialAccessToken;
     }
 
     final public function clientId(): ?string
@@ -43,9 +47,9 @@ final class OidcClientConfig
         return $this->clientSecret;
     }
 
-    final public function redirectUri(): string
+    final public function initialAccessToken()
     {
-        return $this->redirectUri;
+        return $this->initialAccessToken;
     }
 
     /**
