@@ -11,6 +11,7 @@ use Meent\WebHook\Controller\ApiController;
 use Meent\WebHook\Controller\DocsController;
 use Meent\WebHook\Solid\OidcClientConfig;
 use Meent\WebHook\Solid\SolidClientFactory;
+use Meent\WebHook\Solid\SolidClientConfig;
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -78,17 +79,59 @@ $rootPath = $pathParts[0] ?? '';
 // Clean up no longer needed variables
 unset($accept, $acceptHeader, $apiKey, $pathParts, $queryParams);
 
-    case 'application/json':
-    default:
-        $outputType = 'json';
-    break;
+$useOffline = match ($rootPath) {
+    'admin' => OidcClientConfig::REQUIRE_NEW_AUTHENTICATION,
+    default => OidcClientConfig::REUSE_STORED_AUTHENTICATION,
+};
+
+$solidClientConfig = new SolidClientConfig(
+    useCsrf: true,
+    // For certain issuers (like https://solidcommunity.net) PKCE is required, even for server-to-server calls.
+    // @FIXME: PKCE use should be stored in the server offline grant or metadata JSON.
+    usePkce: true,
+    expirationTime: $config->get(Config::KEY_JWT_TTL),
+    stateSigningKey: $config->get(Config::KEY_STATE_SIGNING_KEY),
+);
+
+if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
+    // Client metadata file not found, creating...
+    $baseUrl = $request->getUri()->withPath('')->withFragment('')->withQuery('');
+
+    $oidcClientConfig = new OidcClientConfig(
+        $config->get(Config::KEY_CLIENT_NAME),
+        redirectUris: [
+            (string) $baseUrl->withPath('/api/consent'),
+            (string) $baseUrl->withPath('/admin'),
+        ],
+        // @TODO: Add client_id when explicitly configured (static registration or Client URI "${clientServer}/${clientConfigFile}")
+        // @TODO: Add initialAccessToken: $config->get(Config::KEY_INITIAL_ACCESS_TOKEN),
+    );
+
+    $clientMetadataString = json_encode($oidcClientConfig,
+        JSON_PRETTY_PRINT
+        | JSON_THROW_ON_ERROR
+        | JSON_UNESCAPED_SLASHES // Don't escape slashes `/`.
+    );
+
+    $clientFilesystem->write(OidcClientConfig::METADATA_FILE, $clientMetadataString);
+} else {
+    $clientMetadataString = $clientFilesystem->read(OidcClientConfig::METADATA_FILE);
+    $clientMetadata = json_decode($clientMetadataString, true, 512, JSON_THROW_ON_ERROR);
+
+    $oidcClientConfig = new OidcClientConfig(
+        clientName: $clientMetadata['client_name'],
+        redirectUris: $clientMetadata['redirect_uris'],
+        useOffline: $useOffline,
+        // Keep client_id only when explicitly configured
+        clientId: $clientMetadata['client_id'] ?? null,
+        initialAccessToken: $config->get(Config::KEY_INITIAL_ACCESS_TOKEN)
+    );
 }
 
 switch ($rootPath) {
     case 'api':
-        $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
-        $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $clientRedirectUri);
-        $solidClient = $solidClientFactory->create(SolidClientFactory::REUSE_STORED_AUTHENTICATION);
+        $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
+        $solidClient = $solidClientFactory->create($solidClientConfig);
 
         $controller = new ApiController(
             $dataFilesystem,
@@ -107,9 +150,8 @@ switch ($rootPath) {
     break;
 
     case 'admin':
-        $clientRedirectUri = $request->getUri()->withFragment('')->withQuery('')->__toString();
-        $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $clientRedirectUri);
-        $solidClient = $solidClientFactory->create(SolidClientFactory::REQUIRE_NEW_AUTHENTICATION);
+        $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
+        $solidClient = $solidClientFactory->create($solidClientConfig);
         $webIdInformationService = new WebIdInformation($clientFilesystem, $dataFilesystem);
 
         $controller = new AdminController(

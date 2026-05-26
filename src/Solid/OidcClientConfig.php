@@ -2,7 +2,7 @@
 
 namespace Meent\WebHook\Solid;
 
-final class OidcClientConfig
+class OidcClientConfig
 {
     public const METADATA_FILE = 'client_metadata.json';
 
@@ -25,19 +25,15 @@ final class OidcClientConfig
 
     final public function __construct(
         string $clientName,
-        string $clientSecret,
-        string $redirectUri,
         array $redirectUris,
-        ?string $clientId,
         ?bool $useOffline = self::REUSE_STORED_AUTHENTICATION,
+        ?string $clientId = null,
         ?string $initialAccessToken = null,
     ) {
         $this->clientId = $clientId;
         $this->clientName = $clientName;
-        $this->clientSecret = $clientSecret;
-        $this->redirectUri = $redirectUri;
-        $this->redirectUris = array_values($redirectUris);
         $this->initialAccessToken = $initialAccessToken;
+        $this->redirectUris = array_values($redirectUris);
         $this->useOffline = $useOffline;
 
         $this->grantTypes = ['authorization_code'];
@@ -86,6 +82,20 @@ final class OidcClientConfig
     final public function scope()
     {
         return implode(' ', $this->scope);
+    }
+
+    final public function toArray()
+    {
+        return array_filter([
+            'client_id' => $this->clientId(),
+            'client_name' => $this->clientName(),
+            'grant_types' => $this->grantTypes(),
+            'initial_access_token' => $this->initialAccessToken(),
+            'redirect_uris' => $this->redirectUris(),
+            'scope' => $this->scope(),
+        ], static function ($value) {
+            return ! empty($value);
+        });
     }
 
     final public function useOffline()

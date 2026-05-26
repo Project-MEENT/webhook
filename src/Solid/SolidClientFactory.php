@@ -37,18 +37,21 @@ class SolidClientFactory
 {
     public const DPOP_JWK_FILE = 'dpop_jwk.json';
 
-    private string $clientRedirectUri;
     private Config $config;
     private FilesystemOperator $filesystem;
+    private OidcClientConfig  $oidcClientConfig;
 
-    final public function __construct(Config $config, FilesystemOperator $filesystem, $clientRedirectUri)
-    {
-        $this->clientRedirectUri = $clientRedirectUri;
+    final public function __construct(
+        Config $config,
+        FilesystemOperator $filesystem,
+        OidcClientConfig $oidcClientConfig,
+    ) {
         $this->config = $config;
         $this->filesystem = $filesystem;
+        $this->oidcClientConfig = $oidcClientConfig;
     }
 
-    final public function create(bool $useOffline): SolidClient
+    final public function create(SolidClientConfig $solidClientConfig): SolidClient
     {
         $httpClientConfig = [
             // Allow self-signed certificates for local development
@@ -57,16 +60,9 @@ class SolidClientFactory
             // 'verify_peer' => false,
         ];
 
-        $clientRedirectUri = $this->clientRedirectUri;
         $dpopJwkFile = self::DPOP_JWK_FILE;
         $useCsrf = true;
         $usePkce = true;
-
-        $oidcClientConfig = $this->createClientConfig(
-            $this->filesystem,
-            $this->config->get(Config::KEY_CLIENT_NAME),
-            $clientRedirectUri,
-        );
 
         $cache = $this->createCache($this->filesystem);
 
@@ -82,18 +78,9 @@ class SolidClientFactory
 
         $authorizationService = $this->createAuthorizationServiceBuild($httpClient);
 
-        $solidClientConfig = new SolidClientConfig(
-            // For certain issuers (like https://solidcommunity.net) PKCE is required, even for server-to-server calls.
-            // @FIXME: PKCE use should be stored in the server offline grant or metadata JSON.
-            useCsrf: $useCsrf,
-            usePkce: $usePkce,
-            expirationTime: $this->config->get(Config::KEY_JWT_TTL),
-            stateSigningKey: $this->config->get(Config::KEY_STATE_SIGNING_KEY),
-        );
-
         return new SolidClient(
             $solidClientConfig,
-            $oidcClientConfig,
+            $this->oidcClientConfig,
             $authorizationService,
             $oidcClientBuilder,
             $dpopProofFactory,
@@ -103,44 +90,6 @@ class SolidClientFactory
             new IdTokenVerifierBuilder(),
             $issuerBuilder,
             $registration,
-        );
-    }
-
-    final public function createClientConfig(
-        FilesystemOperator $filesystem,
-        string $defaultClientName,
-        string $clientRedirectUri,
-    ): OidcClientConfig {
-        $clientConfig = [];
-
-        if ($filesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
-            try {
-                $contents = json_decode($filesystem->read(OidcClientConfig::METADATA_FILE), true, 512, JSON_THROW_ON_ERROR);
-                if (is_array($contents)) {
-                    $clientConfig = $contents;
-                }
-            } catch (\JsonException $e) {
-                // Invalid persisted JSON; regenerate below.
-            }
-        }
-
-        // Keep client_id only when explicitly configured (static registration or Client URI "${clientServer}/${clientConfigFile}")
-        $clientId = $clientConfig['client_id'] ?? null;
-        $clientName = $clientConfig['client_name'] ?? $defaultClientName;
-        if (isset($clientConfig['redirect_uris'])) {
-            $clientRedirectUris = $clientConfig['redirect_uris'];
-            $clientRedirectUri = reset($clientRedirectUris);
-        } else {
-            $clientRedirectUris = [$clientRedirectUri];
-        }
-        $clientSecret = $clientConfig['client_secret'] ?? Utility::base64UrlEncode(random_bytes(32));
-
-        return new OidcClientConfig(
-            clientName: $clientName,
-            clientSecret: $clientSecret,
-            redirectUri: $clientRedirectUri,
-            redirectUris: $clientRedirectUris,
-            clientId: is_string($clientId) ? $clientId : null,
         );
     }
 

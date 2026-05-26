@@ -385,12 +385,11 @@ class SolidClient
 
     private function getClaims(IssuerInterface $issuer): array
     {
-        $localClientConfig = $this->getClientConfig();
-        $localClientId = $localClientConfig['client_id'] ?? null;
+        $localClientId = $this->oidcConfig->clientId();
 
         if (is_string($localClientId) && filter_var($localClientId, FILTER_VALIDATE_URL)) {
             // Client ID Document mode: use the local config directly, no registration.
-            return $localClientConfig;
+            return $this->oidcConfig->toArray();
         }
 
         // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
@@ -509,44 +508,6 @@ class SolidClient
         }
 
         return $verifier->verify($idToken);
-    }
-
-    private function getClientConfig()
-    {
-        $filesystem = $this->filesystem;
-
-        // @FIXME: The Oidc Client config file should be created before SolidClient instantiation
-        if (! $filesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
-            // Client metadata file not found, creating...
-            $data = [
-                'client_name' => $this->oidcConfig->clientName(),
-                'client_secret' => $this->oidcConfig->clientSecret(),
-                'redirect_uris' => $this->oidcConfig->redirectUris(),
-                'token_endpoint_auth_method' => 'client_secret_basic', // the auth method for the token endpoint
-            ];
-
-            $clientId = $this->oidcConfig->clientId();
-            if (is_string($clientId) && $clientId !== '') {
-                $data['client_id'] = $clientId;
-            }
-
-            if ($this->config->useOffline() === true) {
-                // grant_types must include refresh_token to receive one (OIDC Core Section 11 / offline_access)
-                $data['grant_types'] = ['authorization_code', 'refresh_token'];
-                $data['scope'] = 'openid webid offline_access';
-            }
-
-            $filesystem->write(OidcClientConfig::METADATA_FILE, json_encode($data,
-                JSON_PRETTY_PRINT
-                | JSON_THROW_ON_ERROR
-                | JSON_UNESCAPED_SLASHES // Don't escape slashes `/`.
-            ));
-        }
-
-        // Reading oidcClient metadata from file
-        $json = $filesystem->read(OidcClientConfig::METADATA_FILE);
-
-        return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 
     private function getRedirectAuthorizationUri(
@@ -795,7 +756,7 @@ class SolidClient
     private function registerClaims(IssuerInterface $issuer)
     {
         // Client not registered, registering oidcClient...
-        $clientConfig = $this->getClientConfig();
+        $clientConfig = $this->oidcConfig->toArray();
         // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
         try {
             // @TODO: If the issuer requires pre-registration, an initial access token (provided during registration on the oidcClient) can be provided here.
