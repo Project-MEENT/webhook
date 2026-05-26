@@ -59,7 +59,6 @@ class ApiController extends AbstractController
             return $this->errorResponse->notFound('API Version Not Found','API version not found: '. $e->getMessage() . '. MUST be one of ' . implode(', ', self::AVAILABLE_VERSIONS), '#invalid-api-version');
         }
 
-
         switch ($subject) {
             case self::SUBJECT_CONSENT:
                 if ($version >= 0.4) {
@@ -218,7 +217,8 @@ class ApiController extends AbstractController
                 if (isset($queryParams['error'])) {
                     $response = $this->errorResponse->badGateway('Provider Error','The Provider returned an error: "' . urldecode($queryParams['error']) . '"');
                 } elseif ($isRedirect) {
-                    $webIdUrl = $this->solidClient->handleRedirect($queryParams, $this->session);
+                    $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
+                    $webIdUrl = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
                     $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
                 } elseif (! $webIdUrl) {
                     $form = file_get_contents(__DIR__ . '/../content/forms/consent.html');

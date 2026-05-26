@@ -55,7 +55,8 @@ class AdminController extends AbstractController
             if (isset($queryParams['error'])) {
                 $response = $this->errorResponse->badGateway('Solid login error','The Solid provider returned an error: ' . urldecode((string) $queryParams['error']));
             } elseif (isset($queryParams['code'])) {
-                $authenticatedWebId = $this->solidClient->handleRedirect($queryParams, $this->session);
+                $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
+                $authenticatedWebId = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
 
                 if (! in_array($this->normalizeUrl($authenticatedWebId), $this->adminWebIds, true)) {
                     $this->session->remove(self::SESSION_KEY_AUTHENTICATED_WEBID);

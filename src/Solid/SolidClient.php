@@ -149,7 +149,7 @@ class SolidClient
         return $redirectAuthorizationUri;
     }
 
-    final public function handleRedirect($queryParams, Session $session): string
+    final public function handleRedirect($queryParams, Session $session, string $redirectUrl): string
     {
         // Step 3. Exchange code for access token
 
@@ -217,7 +217,12 @@ class SolidClient
         }
 
         try {
-            $tokenSet = $this->getTokenSet($oidcClient, $authorizationCode, $codeVerifier);
+            $tokenSet = $this->getTokenSet(
+                $oidcClient,
+                $authorizationCode,
+                $redirectUrl,
+                $codeVerifier
+            );
             $session->remove('pkce_code_verifier');
         } catch (\Throwable $e) {
             $session->remove('pkce_code_verifier');
@@ -648,12 +653,13 @@ class SolidClient
     private function getTokenSet(
         OidcClientInterface $oidcClient,
         $authorizationCode,
+        $redirectUrl,
         ?string $codeVerifier = null,
     ): TokenSetInterface {
         $params = [
             'code' => $authorizationCode,
             'grant_type' => 'authorization_code',
-            'redirect_uri' => $this->oidcConfig->redirectUri(),
+            'redirect_uri' => $redirectUrl,
         ];
 
         if ($this->config->usePkce() === true && is_string($codeVerifier) && $codeVerifier !== '') {
