@@ -88,8 +88,7 @@ class SolidClientFactory
             useCsrf: $useCsrf,
             usePkce: $usePkce,
             expirationTime: $this->config->get(Config::KEY_JWT_TTL),
-            // @FIXME: Use separate secret (i.e. private key) for signing, so it can be rotated.
-            stateSigningKey: $oidcClientConfig->clientSecret(),
+            stateSigningKey: $this->config->get(Config::KEY_STATE_SIGNING_KEY),
         );
 
         return new SolidClient(

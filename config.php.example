@@ -9,4 +9,5 @@ return [
     'jwt_ttl' => 300, // 5 minutes in seconds
     'metadata_cache_ttl' => 2592000, // 30 days in seconds
     'solid_storage_path' => __DIR__ . '/build/storage',
+    'state_signing_key' => 'abcdefghijklmnopqrstuvwxyz01234567890ABCDEF',
 ];

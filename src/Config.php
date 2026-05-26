@@ -11,6 +11,7 @@ class Config
     public const KEY_JWT_TTL = 'jwt_ttl';
     public const KEY_METADATA_CACHE_TTL = 'metadata_cache_ttl';
     public const KEY_SOLID_STORAGE_PATH = 'solid_storage_path';
+    public const KEY_STATE_SIGNING_KEY = 'state_signing_key';
 
     private const ERROR_CONFIG_NOT_ARRAY = 'Provided config file must return an array.';
     private const ERROR_FILE_NOT_EXISTS = 'Provided config file "%s" does not exist.';
@@ -30,6 +31,7 @@ class Config
         self::KEY_JWT_TTL => 'Expiration time of OAuth state JWTs, in seconds.',
         self::KEY_METADATA_CACHE_TTL => 'Expiration time of the OIDC metadata cache, in seconds',
         self::KEY_SOLID_STORAGE_PATH => 'Used for persistent storage of Solid Client and Issuer metadata, DPoP keys, and OAuth state JWTs.',
+        self::KEY_STATE_SIGNING_KEY => 'Secret key used to sign OAuth state JWTs. Should be a long random string, and kept secret.',
     ];
 
     final public static function fromFile(string $filePath): self
