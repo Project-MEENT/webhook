@@ -9,7 +9,6 @@ use League\Flysystem\Local\LocalFilesystemAdapter;
 use Meent\WebHook\Controller\AdminController;
 use Meent\WebHook\Controller\ApiController;
 use Meent\WebHook\Solid\OidcClientConfig;
-use Meent\WebHook\Solid\Session;
 use Meent\WebHook\Solid\SolidClientFactory;
 
 error_reporting(E_ALL);

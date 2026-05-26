@@ -17,6 +17,7 @@ use Facile\OpenIDClient\Token\TokenSetInterface;
 use GuzzleHttp\Client as HttpClient;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Exception\SolidException;
+use Meent\WebHook\Session;
 use Meent\WebHook\UrlHashTrait;
 use Psr\Http\Message\ResponseInterface;
 

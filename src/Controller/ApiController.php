@@ -8,7 +8,7 @@ use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception;
 use Meent\WebHook\Exception\SolidException;
 use Meent\WebHook\Record;
-use Meent\WebHook\Solid\Session;
+use Meent\WebHook\Session;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
 use Psr\Http\Message\RequestInterface;

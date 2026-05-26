@@ -1,6 +1,6 @@
 <?php
 
-namespace Meent\WebHook\Solid;
+namespace Meent\WebHook;
 
 class Session
 {

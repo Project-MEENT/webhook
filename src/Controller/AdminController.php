@@ -3,7 +3,7 @@
 namespace Meent\WebHook\Controller;
 
 use Meent\WebHook\ErrorResponse;
-use Meent\WebHook\Solid\Session;
+use Meent\WebHook\Session;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
 use Meent\WebHook\WebIdInformation;
