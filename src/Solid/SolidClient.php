@@ -405,17 +405,17 @@ class SolidClient
                 );
             }
 
-            $clientMetadataFile = $this->getClientMetaDataFilePath($issuer);
+            $issuerMetaDataFilePath = $this->getIssuerMetaDataFilePath($issuer);
             $fileContents = json_encode($registeredClaims,
                 JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
-            $this->filesystem->write($clientMetadataFile, $fileContents);
+            $this->filesystem->write($issuerMetaDataFilePath, $fileContents);
         }
 
         return $registeredClaims;
     }
 
-    private function getClientMetaDataFilePath(IssuerInterface $issuer)
+    private function getIssuerMetaDataFilePath(IssuerInterface $issuer)
     {
         $issuerConfig = $issuer->getMetadata()->toArray();
         $issuerUrl = $issuerConfig['issuer'];
@@ -456,13 +456,13 @@ class SolidClient
     {
         $registeredClaims = [];
 
-        $clientMetadataFile = $this->getClientMetaDataFilePath($issuer);
+        $issuerMetadataFile = $this->getIssuerMetaDataFilePath($issuer);
 
-        $clientMetadataFileExists = $this->filesystem->fileExists($clientMetadataFile);
+        $issuerMetadataFileExists = $this->filesystem->fileExists($issuerMetadataFile);
 
-        if ($clientMetadataFileExists) {
+        if ($issuerMetadataFileExists) {
             // Client already registered, reading metadata from file
-            $fileContents = $this->filesystem->read($clientMetadataFile);
+            $fileContents = $this->filesystem->read($issuerMetadataFile);
             $decoded = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
             // json_decode can return null for a literal JSON null value; only accept arrays.
             if (is_array($decoded)) {
