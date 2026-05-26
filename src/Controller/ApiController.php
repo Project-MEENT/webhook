@@ -35,15 +35,18 @@ class ApiController extends AbstractController
     private const SUBJECT_REGISTER = 'register';
 
     private FilesystemOperator $filesystem;
+    private Session $session;
     private SolidClient $solidClient;
 
     final public function __construct(
         FilesystemOperator $filesystem,
         SolidClient $solidClient,
+        Session $session,
         ErrorResponse $errorResponse
     ) {
         $this->errorResponse = $errorResponse;
         $this->filesystem = $filesystem;
+        $this->session = $session;
         $this->solidClient = $solidClient;
     }
 
@@ -215,7 +218,7 @@ class ApiController extends AbstractController
                 if (isset($queryParams['error'])) {
                     $response = $this->errorResponse->badGateway('Provider Error','The Provider returned an error: "' . urldecode($queryParams['error']) . '"');
                 } elseif ($isRedirect) {
-                    $webIdUrl = $this->solidClient->handleRedirect($queryParams, Session::current());
+                    $webIdUrl = $this->solidClient->handleRedirect($queryParams, $this->session);
                     $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
                 } elseif (! $webIdUrl) {
                     $form = file_get_contents(__DIR__ . '/../content/forms/consent.html');
@@ -234,7 +237,7 @@ class ApiController extends AbstractController
                         "<p>Your P1 dongle can now be connected to your Solid Pod, using WebID <a href='$webIdUrl'>$webIdUrl</a></p>",
                     );
                 } else {
-                    $redirectUri = $this->solidClient->connectWebId($webIdUrl, Session::current());
+                    $redirectUri = $this->solidClient->connectWebId($webIdUrl, $this->session);
                 }
 
                 // Create Response

@@ -35,9 +35,7 @@ $request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, 
 
 $errorResponse = new ErrorResponse();
 
-$path = $request->getUri()->getPath();
-$pathParts = array_values(array_filter(explode('/', $path)));
-$rootPath = $pathParts[0] ?? '';
+$session = Session::current();
 
 $acceptHeader = $request->getHeaderLine('Accept');
 $queryParams = $request->getQueryParams();
@@ -80,7 +78,13 @@ switch ($rootPath) {
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $clientRedirectUri);
         $solidClient = $solidClientFactory->create(SolidClientFactory::REUSE_STORED_AUTHENTICATION);
 
-        $controller = new ApiController($dataFilesystem, $solidClient, $errorResponse);
+        $controller = new ApiController(
+            $dataFilesystem,
+            $solidClient,
+            $session,
+            $errorResponse
+        );
+
         try {
             $response = $controller->handleRequest($request);
         } catch (FilesystemException $exception) {
@@ -98,7 +102,7 @@ switch ($rootPath) {
 
         $controller = new AdminController(
             $solidClient,
-            Session::current(),
+            $session,
             $webIdInformationService,
             $config->get(Config::KEY_ADMIN_WEBIDS),
             $errorResponse
