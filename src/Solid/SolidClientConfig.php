@@ -7,12 +7,10 @@ final class SolidClientConfig
     private string $stateSigningKey;
     private int $expirationTime;
     private bool $useCsrf;
-    private bool $useOffline;
     private bool $usePkce;
 
     public function __construct(
         bool $useCsrf,
-        bool $useOffline,
         bool $usePkce,
         int $expirationTime,
         string $stateSigningKey,
@@ -20,7 +18,6 @@ final class SolidClientConfig
         $this->stateSigningKey = $stateSigningKey;
         $this->expirationTime = $expirationTime;
         $this->useCsrf = $useCsrf;
-        $this->useOffline = $useOffline;
         $this->usePkce = $usePkce;
     }
 
@@ -37,11 +34,6 @@ final class SolidClientConfig
     public function useCsrf(): bool
     {
         return $this->useCsrf;
-    }
-
-    public function useOffline(): bool
-    {
-        return $this->useOffline;
     }
 
     public function usePkce(): bool

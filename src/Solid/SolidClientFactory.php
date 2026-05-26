@@ -36,8 +36,6 @@ use Psr\SimpleCache\CacheInterface;
 class SolidClientFactory
 {
     public const DPOP_JWK_FILE = 'dpop_jwk.json';
-    public const REQUIRE_NEW_AUTHENTICATION = false;
-    public const REUSE_STORED_AUTHENTICATION = true;
 
     private string $clientRedirectUri;
     private Config $config;
@@ -88,7 +86,6 @@ class SolidClientFactory
             // For certain issuers (like https://solidcommunity.net) PKCE is required, even for server-to-server calls.
             // @FIXME: PKCE use should be stored in the server offline grant or metadata JSON.
             useCsrf: $useCsrf,
-            useOffline: $useOffline,
             usePkce: $usePkce,
             expirationTime: $this->config->get(Config::KEY_JWT_TTL),
             // @FIXME: Use separate secret (i.e. private key) for signing, so it can be rotated.

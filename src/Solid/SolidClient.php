@@ -129,7 +129,7 @@ class SolidClient
         $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
 
         // On first connect, there is no grant, so skip directly to interactive auth flow.
-        if ($this->config->useOffline() === true && ! $this->filesystem->fileExists($offlineGrantFile)) {
+        if ($this->oidcConfig->useOffline() === true && ! $this->filesystem->fileExists($offlineGrantFile)) {
             try {
                 $accessToken = $this->handleOfflineAccess($oidcClient, $issuer, $webIdUrl);
 
@@ -243,7 +243,7 @@ class SolidClient
         // -------------------------------------------------------------------------
         // Persist tokens for offline operation — written directly to the grant file,
         // Store refresh_token server-side; never expose to browser (OIDC Core Section 12).
-        if ($this->config->useOffline() === true) {
+        if ($this->oidcConfig->useOffline() === true) {
             $refreshToken = $tokenSet->getRefreshToken();
             if (! is_string($refreshToken) || $refreshToken === '') {
                 throw SolidException::create(
@@ -598,7 +598,7 @@ class SolidClient
             $authorizationRequestParams['code_challenge_method'] = 'S256'; // RFC7636: clients capable of S256 MUST use S256.
         }
 
-        if ($this->config->useOffline() === true) {
+        if ($this->oidcConfig->useOffline() === true) {
             // offline_access requires explicit consent so the OP actually issues a refresh token (OIDC Core Section 11).
             $grant = $this->getOfflineGrant($issuer, $webIdUrl);
             if (empty($grant['solid_refresh_token'])) {
