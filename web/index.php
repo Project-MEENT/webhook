@@ -8,6 +8,7 @@ use League\Flysystem\FilesystemException;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use Meent\WebHook\Controller\AdminController;
 use Meent\WebHook\Controller\ApiController;
+use Meent\WebHook\Controller\DocsController;
 use Meent\WebHook\Solid\OidcClientConfig;
 use Meent\WebHook\Solid\SolidClientFactory;
 
@@ -38,6 +39,7 @@ $errorResponse = new ErrorResponse();
 $session = Session::current();
 
 $acceptHeader = $request->getHeaderLine('Accept');
+
 $queryParams = $request->getQueryParams();
 if (isset($queryParams['accept'])) {
     $acceptHeader = $queryParams['accept'];
@@ -60,11 +62,21 @@ $accept = array_map(static function ($value) {
     return explode(';', $value)[0];
 }, explode(',', $acceptHeader));
 
-switch ($accept[0]) {
-    case 'application/xhtml+xml':
-    case 'text/html':
-        $outputType = 'html';
-    break;
+$outputType = match ($accept[0]) {
+    'application/xhtml+xml', 'text/html' => 'html',
+    'application/json' => 'json',
+};
+
+
+$pathParts = array_values(
+    array_filter(
+        explode('/', $request->getUri()->getPath())
+    )
+);
+$rootPath = $pathParts[0] ?? '';
+
+// Clean up no longer needed variables
+unset($accept, $acceptHeader, $apiKey, $pathParts, $queryParams);
 
     case 'application/json':
     default:
@@ -88,9 +100,9 @@ switch ($rootPath) {
         try {
             $response = $controller->handleRequest($request);
         } catch (FilesystemException $exception) {
-            $response = $errorResponse->badGateway('Write Failed','Failed to write data: ' . $exception->getMessage());
+            $response = $errorResponse->internalServerError('Write Failed', 'Failed to write data: ' . $exception->getMessage());
         } catch (\Exception $exception) {
-            $response = $errorResponse->internalServerError('Unexpected Error','An unexpected error occurred: ' . $exception->getMessage());
+            $response = $errorResponse->internalServerError('Unexpected Error', 'An unexpected error occurred: ' . $exception->getMessage());
         }
     break;
 
@@ -114,13 +126,16 @@ switch ($rootPath) {
     case '':
     case 'docs':
     case 'errors':
-        $controller = new \Meent\WebHook\Controller\DocsController(new \League\CommonMark\GithubFlavoredMarkdownConverter(), $errorResponse);
+        $controller = new DocsController(
+            new \League\CommonMark\GithubFlavoredMarkdownConverter(),
+            $errorResponse
+        );
         $response = $controller->handleRequest($request);
     break;
 
     default:
         $response['content'] = [[
-            'detail' => "The requested resource '$path' was not found on this server.",
+            'detail' => 'The requested resource "' . $request->getUri()->getPath() . '" was not found on this server.',
             'pointer' => '#not-found',
         ]];
         $response['status'] = 404;
@@ -136,7 +151,7 @@ if ($output) {
         $output = urldecode($output);
     }
 
-    $response = $errorResponse->internalServerError('Unexpected Output','The response caused unexpected output: ' . $output);
+    $response = $errorResponse->internalServerError('Unexpected Output', 'The response caused unexpected output: ' . $output);
 }
 
 $content = $response['content'] ?? null;
@@ -193,7 +208,7 @@ if ($outputType === 'html') {
     }
 
     try {
-        $content = json_encode($body, JSON_PRETTY_PRINT  | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $content = json_encode($body, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
     } catch (\JsonException $e) {
         $body = <<<'JSON'
         {
