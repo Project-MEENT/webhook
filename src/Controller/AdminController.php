@@ -109,6 +109,7 @@ class AdminController extends AbstractController
                                         'Admin dashboard',
                                         $logoutForm,
                                         "<section>$WebIdsHtml</section>",
+                                        'forms/show-password.js',
                                     );
 
                                     $response = [

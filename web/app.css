@@ -1,3 +1,13 @@
+/********( CSS Index )*********************************************************/
+/*
+    1. Generic Styles
+    2. Form Styles
+        2.1. Fancy checkboxes
+        2.2. "Show Password" button
+        2.2. "Show Password" button
+ */
+
+/*=======( Generic styles )===================================================*/
 title {
     display: inline;
 }
@@ -14,7 +24,11 @@ td:has(a, code) {
     white-space: wrap;
     word-wrap: anywhere;
 }
-.webid-info input {
+
+/*=======( Form styles )======================================================*/
+
+/*-------( Fancy checkboxes )-------------------------------------------------*/
+.webid-info input[type="checkbox"] {
     --checkbox-color: var(--color-secondary, #888);
     --checkbox-size: 1.35em;
     appearance: none;
@@ -45,23 +59,34 @@ td:has(a, code) {
 .webid-info input[type="checkbox"]:checked::before {
     visibility: visible;
 }
-.webid-info td {
+
+/*-------( "Show Password" button )-------------------------------------------*/
+/* <label><input type="password" /><a data-js="show-password">👁️</a></label>  */
+a[data-js="show-password"] {
+    font-size: 1.35rem;
+    position: absolute;
+    right: 0;
+    text-decoration: none;
+    top: 0.15em;
+}
+
+input[type="text"] + a[data-js="show-password"]:after {
+    content: "❌";
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+
+input:has(+ a[data-js="show-password"]:hover) {
+    color: var(--color-link, #8884);
+}
+
+label:has( > a[data-js="show-password"]) {
+    padding-right: 2.35rem;
     position: relative;
 }
 
-/* Add righ margin to input the has <A> sibling*/
-.webid-info td input:has(+ a) {
-    margin-right: 1rem;
-}
-
-.webid-info td a[onmouseover] {
-    font-size: 1.35rem;
-    position: absolute;
-    right: 0.85rem;
-    text-decoration: none;
-    top: 0.5rem;
-}
-
+/*-------( "Logout" button )--------------------------------------------------*/
 form[action$="logout"] {
     margin: 0 auto;
     padding: 0.15rem 1rem;
