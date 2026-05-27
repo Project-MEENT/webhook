@@ -107,7 +107,7 @@ if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
         // @TODO: Add initialAccessToken: $config->get(Config::KEY_INITIAL_ACCESS_TOKEN),
     );
 
-    $clientMetadataString = json_encode($oidcClientConfig,
+    $clientMetadataString = json_encode($oidcClientConfig->toArray(),
         JSON_PRETTY_PRINT
         | JSON_THROW_ON_ERROR
         | JSON_UNESCAPED_SLASHES // Don't escape slashes `/`.
