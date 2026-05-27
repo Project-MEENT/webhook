@@ -375,6 +375,18 @@ class SolidClient
     private function createOidcClientFromIssuer(IssuerInterface $issuer)
     {
         $registeredClaims = $this->getClaims($issuer);
+
+        // @KLUDGE: The OIDC Client library send the first redirect_uri, ignoring
+        //          regardless of which redirect_uri has been set in the grant.
+        //          So we need to make sure the desired URL is the first in the array.
+        $redirectUri = $this->config->redirectUri();
+
+        $registeredClaims['redirect_uris'] = array_filter($registeredClaims['redirect_uris'] ?? [], static function ($uri) use ($redirectUri) {
+            return $uri !== $redirectUri;
+        });
+
+        array_unshift($registeredClaims['redirect_uris'], $redirectUri);
+
         $clientMetadata = ClientMetadata::fromArray($registeredClaims);
 
         return $this->oidcClientBuilder

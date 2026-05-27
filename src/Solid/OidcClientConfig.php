@@ -11,9 +11,7 @@ class OidcClientConfig
 
     private ?string $clientId;
     private string $clientName;
-    private string $clientSecret;
     private ?string $initialAccessToken;
-    private string $redirectUri;
     private bool $useOffline;
 
     /** @var string[] */
@@ -54,11 +52,6 @@ class OidcClientConfig
     final public function clientName(): string
     {
         return $this->clientName;
-    }
-
-    final public function clientSecret(): string
-    {
-        return $this->clientSecret;
     }
 
     final public function grantTypes()

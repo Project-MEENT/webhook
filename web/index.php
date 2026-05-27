@@ -79,24 +79,10 @@ $rootPath = $pathParts[0] ?? '';
 // Clean up no longer needed variables
 unset($accept, $acceptHeader, $apiKey, $pathParts, $queryParams);
 
-$useOffline = match ($rootPath) {
-    'admin' => OidcClientConfig::REQUIRE_NEW_AUTHENTICATION,
-    default => OidcClientConfig::REUSE_STORED_AUTHENTICATION,
-};
-
-$solidClientConfig = new SolidClientConfig(
-    useCsrf: true,
-    // For certain issuers (like https://solidcommunity.net) PKCE is required, even for server-to-server calls.
-    // @FIXME: PKCE use should be stored in the server offline grant or metadata JSON.
-    usePkce: true,
-    expirationTime: $config->get(Config::KEY_JWT_TTL),
-    stateSigningKey: $config->get(Config::KEY_STATE_SIGNING_KEY),
-);
+$baseUrl = $request->getUri()->withPath('')->withFragment('')->withQuery('');
 
 if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
     // Client metadata file not found, creating...
-    $baseUrl = $request->getUri()->withPath('')->withFragment('')->withQuery('');
-
     $oidcClientConfig = new OidcClientConfig(
         $config->get(Config::KEY_CLIENT_NAME),
         redirectUris: [
@@ -121,7 +107,6 @@ if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
     $oidcClientConfig = new OidcClientConfig(
         clientName: $clientMetadata['client_name'],
         redirectUris: $clientMetadata['redirect_uris'],
-        useOffline: $useOffline,
         // Keep client_id only when explicitly configured
         clientId: $clientMetadata['client_id'] ?? null,
         initialAccessToken: $config->get(Config::KEY_INITIAL_ACCESS_TOKEN)
@@ -130,6 +115,14 @@ if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
 
 switch ($rootPath) {
     case 'api':
+        $solidClientConfig = new SolidClientConfig(
+            useCsrf: true,
+            usePkce: true,
+            expirationTime: $config->get(Config::KEY_JWT_TTL),
+            stateSigningKey: $config->get(Config::KEY_STATE_SIGNING_KEY),
+            redirectUri: $baseUrl->withPath('/api/consent'),
+        );
+
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
         $solidClient = $solidClientFactory->create($solidClientConfig);
 
@@ -150,6 +143,14 @@ switch ($rootPath) {
     break;
 
     case 'admin':
+        $solidClientConfig = new SolidClientConfig(
+            useCsrf: true,
+            usePkce: true,
+            expirationTime: $config->get(Config::KEY_JWT_TTL),
+            stateSigningKey: $config->get(Config::KEY_STATE_SIGNING_KEY),
+            redirectUri: $baseUrl->withPath('/admin'),
+        );
+
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
         $solidClient = $solidClientFactory->create($solidClientConfig);
         $webIdInformationService = new WebIdInformation($clientFilesystem, $dataFilesystem);
