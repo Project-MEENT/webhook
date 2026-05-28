@@ -22,7 +22,7 @@ abstract class AbstractController
 
     abstract public function handleRequest(RequestInterface $request);
 
-    final protected function createContent(string $title, string $description, string $body = '', string $script = ''): string
+    final protected function createContent(string $title, string $description, string $body = '', $scripts = null): string
     {
         $context = array_merge(AbstractController::EMPTY_CONTENT, [
             'header' => $description,
@@ -30,12 +30,22 @@ abstract class AbstractController
             'title' => $title,
         ]);
 
-        if( ! empty($script)) {
-            $path = __DIR__ . '/../content/' . $script;
-            if (! file_exists($path)) {
-                throw new RuntimeException('Script file not found: ' . $path);
+        if( ! empty($scripts)) {
+
+            if (is_string($scripts)) {
+                $scripts = [$scripts];
             }
-            $context['script'] = file_get_contents($path);
+
+            array_walk($scripts, function ($script) use (&$context) {
+                $path = __DIR__ . '/../content/' . $script;
+
+                if (! file_exists($path)) {
+                    throw new RuntimeException('Script file not found: ' . $path);
+                }
+
+                $contents = file_get_contents($path);
+                $context['script'] .= "\n/*/ $script /*/\n$contents";
+            });
         }
 
         $template = $this->getContents('template');

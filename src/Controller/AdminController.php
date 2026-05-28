@@ -109,7 +109,10 @@ class AdminController extends AbstractController
                                         'Admin dashboard',
                                         $logoutForm,
                                         "<section>$WebIdsHtml</section>",
-                                        'forms/show-password.js',
+                                        [
+                                            'forms/check-solid-connection.js',
+                                            'forms/show-password.js',
+                                        ],
                                     );
 
                                     $response = [
@@ -218,19 +221,17 @@ class AdminController extends AbstractController
         $template = file_get_contents(__DIR__ . '/../content/webid-table-row.html');
 
         $webIdsInfo = array_map(function ($info) use ($template) {
+            $isAdmin = in_array($info['webid'], $this->adminWebIds, true);
+            $isDongleRegistered = $info['api_key'];
+            $webIdHas = $this->hashUrl($info['webid'], 'sha1');
+
             return vsprintf($template, [
-                $info['webid'],
-                $this->hashUrl($info['webid'], 'sha1'),
-                in_array($info['webid'], $this->adminWebIds, true)
-                    ? 'checked '
-                    : '',
-                $info['has_consent']
-                    ? 'checked '
-                    : '',
-                $info['api_key']
-                    ? 'checked '
-                    : '',
-                $info['api_key'],
+                '%1$s' => $info['webid'],
+                '%2$s' => $webIdHas,
+                '%3$s' => $isAdmin ? 'checked ' : '',
+                '%4$s' => $info['has_consent'] ? 'checked ' : '',
+                '%5$s' => $isDongleRegistered ? 'checked ' : '',
+                '%6$s' => $info['api_key'],
             ]);
         }, $webIds);
 
@@ -241,10 +242,11 @@ class AdminController extends AbstractController
                 <thead>
                 <tr>
                     <th>WebID</th>
-                    <th>Admin<br/>Account</th>
                     <th>Consent<br/>Given</th>
+                    <th>Connected<br>to Pod</th>
                     <th>Dongle<br/>Registered</th>
                     <th>API Key</th>
+                    <th>Admin<br/>Account</th>
                 </tr>
                 </thead>
                 <tbody>$implode</tbody>

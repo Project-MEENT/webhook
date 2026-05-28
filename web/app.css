@@ -64,10 +64,15 @@ td:has(a, code) {
 /* <label><input type="password" /><a data-js="show-password">👁️</a></label>  */
 a[data-js="show-password"] {
     font-size: 1.35rem;
+    opacity: 0.5;
     position: absolute;
     right: 0;
     text-decoration: none;
     top: 0.15em;
+}
+
+a[data-js="show-password"]:hover {
+    opacity: 1;
 }
 
 input[type="text"] + a[data-js="show-password"]:after {
@@ -96,4 +101,16 @@ form[action$="logout"] {
 form[action$="logout"] button {
     margin-left: 1rem;
     padding: 0.15rem;
+}
+
+/*============================================================================*/
+
+a[data-js="check-solid-connection"] {
+    color: #888;
+    background-color: #8884;
+    border-radius: 0;
+    border: 0.15em solid transparent;
+    cursor: default;
+    height: 1.35em;
+    text-decoration: none;
 }

@@ -1,12 +1,13 @@
 <tr>
     <td><a href="%1$s" title="%2$s">%1$s</a></td>
-    <td><input type="checkbox" disabled %3$s/></td>
-    <td><input type="checkbox" disabled %4$s/></td>
-    <td><input type="checkbox" disabled %5$s/></td>
+    <td><input name="consent" type="checkbox" disabled %4$s/></td>
+    <td><a data-js="check-solid-connection"></a></td>
+    <td><input name="dongle" type="checkbox" disabled %5$s/></td>
     <td>
         <label>
-            <input type="password" disabled value="%6$s"/>
+            <input name="api-key" type="password" disabled value="%6$s"/>
             <a aria-hidden="true" data-js="show-password" title="Show password">👁️</a>
         </label>
     </td>
+    <td><input name="isAdmin" type="checkbox" disabled %3$s/></td>
 </tr>
