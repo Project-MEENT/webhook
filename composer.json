@@ -12,7 +12,7 @@
     "license": "EUPL-1.2",
     "name": "meent/webhook",
     "require": {
-        "php": "^8.0",
+        "php": "^8.2",
         "ext-json": "*",
         "ext-mbstring": "*",
         "ext-openssl": "*",
