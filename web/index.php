@@ -66,6 +66,7 @@ $accept = array_map(static function ($value) {
 $outputType = match ($accept[0]) {
     'application/xhtml+xml', 'text/html' => 'html',
     'application/json' => 'json',
+    default => 'json',
 };
 
 
