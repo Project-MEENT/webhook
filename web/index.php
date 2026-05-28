@@ -244,7 +244,7 @@ if ($outputType === 'html') {
 
     $body = [
         'type' => $response['type'] ?? '/errors/',
-        'title' => $response['title'] ?: $response['type'],
+        'title' => $response['title'] ?? $response['type'],
     ];
 
     if (! empty($response['content'])) {
