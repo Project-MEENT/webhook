@@ -4,6 +4,7 @@ namespace Meent\WebHook\Controller;
 
 use EasyRdf\Graph;
 use League\Flysystem\FilesystemOperator;
+use Meent\WebHook\AdminSession;
 use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception;
 use Meent\WebHook\Exception\SolidException;
@@ -34,6 +35,7 @@ class ApiController extends AbstractController
     private const SUBJECT_DATA = 'data';
     private const SUBJECT_REGISTER = 'register';
 
+    private AdminSession $adminSession;
     private FilesystemOperator $filesystem;
     private Session $session;
     private SolidClient $solidClient;
@@ -42,8 +44,10 @@ class ApiController extends AbstractController
         FilesystemOperator $filesystem,
         SolidClient $solidClient,
         Session $session,
+        AdminSession $adminSession,
         ErrorResponse $errorResponse
     ) {
+        $this->adminSession = $adminSession;
         $this->errorResponse = $errorResponse;
         $this->filesystem = $filesystem;
         $this->session = $session;
@@ -100,7 +104,9 @@ class ApiController extends AbstractController
     {
         $auth = $request->getHeaderLine('Authorization');
 
-        if (empty($auth)) {
+        if ($this->adminSession->isAuthenticated() !== '') {
+            $response = [];
+        } elseif (empty($auth)) {
             $response = $this->errorResponse->unauthorized('API key missing','Missing API key');
         } elseif (! str_starts_with($auth, 'Bearer ')) {
             $response = $this->errorResponse->badRequest('Invalid Authorization header',"Invalid Authorization header format, expected 'Bearer {api-key}'", '#invalid-auth-header',
@@ -308,7 +314,7 @@ class ApiController extends AbstractController
         $version = $this->getRequestedVersion($request);
         $queryParams = $request->getQueryParams();
 
-        if ($version >= 0.4 && ! $request->getHeaderLine('Authorization')) {
+        if ($version >= 0.4 && ! $request->getHeaderLine('Authorization') && ! isset($queryParams['webid'])) {
             $form = file_get_contents(__DIR__ . '/../content/forms/data.html');
 
             $content = $this->createContent(
@@ -335,11 +341,15 @@ class ApiController extends AbstractController
         }
 
         $filePath = $this->getRequestedObject($request);
-
-        if (isset($apiKey)) {
+        if (! empty($apiKey)) {
             $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
+        } elseif (isset($queryParams['webid'])) {
+            $webId = $queryParams['webid'];
+        } else {
+            $webId = null;
+        }
 
-
+        if ($webId) {
             $storageUrls = $this->solidClient->fetchStorageUrls($webId);
 
             if ($storageUrls !== []) {

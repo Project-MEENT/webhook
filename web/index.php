@@ -132,6 +132,7 @@ switch ($rootPath) {
             $dataFilesystem,
             $solidClient,
             $session,
+            $adminSession,
             $errorResponse
         );
 
