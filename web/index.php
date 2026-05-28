@@ -38,6 +38,7 @@ $request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, 
 $errorResponse = new ErrorResponse();
 
 $session = Session::current();
+$adminSession = new AdminSession($session, $config->get(Config::KEY_ADMIN_WEBIDS));
 
 $acceptHeader = $request->getHeaderLine('Accept');
 
@@ -159,8 +160,8 @@ switch ($rootPath) {
         $controller = new AdminController(
             $solidClient,
             $session,
+            $adminSession,
             $webIdInformationService,
-            $config->get(Config::KEY_ADMIN_WEBIDS),
             $errorResponse
         );
 

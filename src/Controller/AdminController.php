@@ -2,6 +2,7 @@
 
 namespace Meent\WebHook\Controller;
 
+use Meent\WebHook\AdminSession;
 use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Session;
 use Meent\WebHook\Solid\SolidClient;
@@ -13,15 +14,10 @@ class AdminController extends AbstractController
 {
     use UrlHashTrait;
 
-    private const SESSION_KEY_AUTHENTICATED_AT = 'admin_authenticated_at';
-    private const SESSION_KEY_AUTHENTICATED_WEBID = 'admin_webid';
-    private const SESSION_KEY_CSRF_TOKEN = 'admin_csrf_token';
-    private const SESSION_MAX_AGE = 3600;
-
     private const SUBJECT_LOGIN = 'login';
     private const SUBJECT_LOGOUT = 'logout';
 
-    private array $adminWebIds;
+    private AdminSession $adminSession;
     private Session $session;
     private SolidClient $solidClient;
     private WebIdInformation $webIdInformation;
@@ -29,11 +25,11 @@ class AdminController extends AbstractController
     final public function __construct(
         SolidClient $solidClient,
         Session $session,
+        AdminSession $adminSession,
         WebIdInformation $webIdInformation,
-        array $adminWebIds,
         ErrorResponse $errorResponse,
     ) {
-        $this->adminWebIds = array_map([$this, 'normalizeUrl'], $adminWebIds);
+        $this->adminSession = $adminSession;
         $this->errorResponse = $errorResponse;
         $this->session = $session;
         $this->solidClient = $solidClient;
@@ -58,15 +54,12 @@ class AdminController extends AbstractController
                 $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
                 $authenticatedWebId = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
 
-                if (! in_array($this->normalizeUrl($authenticatedWebId), $this->adminWebIds, true)) {
-                    $this->session->remove(self::SESSION_KEY_AUTHENTICATED_WEBID);
-                    $this->session->remove(self::SESSION_KEY_AUTHENTICATED_AT);
+                if (! $this->adminSession->isAdmin($authenticatedWebId)) {
+                    $this->adminSession->stop();
 
                     $response = $this->errorResponse->forbidden('Unauthorized admin WebID','The authenticated WebID is not allowed to access the admin area: ' . $authenticatedWebId);
                 } else {
-                    session_regenerate_id(true);
-                    $this->session->set(self::SESSION_KEY_AUTHENTICATED_WEBID, $authenticatedWebId);
-                    $this->session->set(self::SESSION_KEY_AUTHENTICATED_AT, time());
+                    $this->adminSession->start($authenticatedWebId);
 
                     $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
                     $response = [
@@ -83,20 +76,12 @@ class AdminController extends AbstractController
                                 $response = $this->handleAllowedHttpMethods(['GET']);
                             break;
                             case 'GET':
-                                $webId = $this->session->get(self::SESSION_KEY_AUTHENTICATED_WEBID);
-                                $authenticatedAt = $this->session->get(self::SESSION_KEY_AUTHENTICATED_AT);
+                                $adminWebId = $this->adminSession->isAuthenticated();
 
-                                if (is_string($webId)
-                                    && $webId !== ''
-                                    && in_array($this->normalizeUrl($webId), $this->adminWebIds, true)
-                                    && is_int($authenticatedAt)
-                                    && (time() - $authenticatedAt) < self::SESSION_MAX_AGE
-                                ) {
-                                    $webId = (string) $this->session->get(self::SESSION_KEY_AUTHENTICATED_WEBID);
-
-                                    $logoutForm = file_get_contents(__DIR__ . '/../content/forms/admin-logout.html');
+                                if ($adminWebId) {
+                                    $logoutForm = $this->getContents('forms/admin-logout');
                                     $logoutForm = $this->addCsrfToForm($logoutForm);
-                                    $logoutForm = str_replace(['{webid}'], [$webId], $logoutForm);
+                                    $logoutForm = str_replace(['{webid}'], [$adminWebId], $logoutForm);
 
                                     $webIds = $this->webIdInformation->getAll();
                                     if ($webIds === []) {
@@ -170,11 +155,10 @@ class AdminController extends AbstractController
                                 $response = $this->handleAllowedHttpMethods(['POST']);
                             break;
                             case 'POST':
-                                if (! $this->isValidCsrfToken($request)) {
+                                if (! $this->hasValidCsrf($request)) {
                                     $response = $this->handleInvalidCsrf();
                                 } else {
-                                    $this->session->remove(self::SESSION_KEY_AUTHENTICATED_WEBID);
-                                    $this->session->remove(self::SESSION_KEY_AUTHENTICATED_AT);
+                                    $this->adminSession->stop();
                                     session_regenerate_id(true);
 
                                     $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
@@ -207,7 +191,7 @@ class AdminController extends AbstractController
 
     private function addCsrfToForm($formContents)
     {
-        $csrfToken = htmlentities($this->getOrCreateCsrfToken());
+        $csrfToken = htmlentities($this->adminSession->csrfToken());
 
         return str_replace(
             '</form>',
@@ -221,7 +205,7 @@ class AdminController extends AbstractController
         $template = file_get_contents(__DIR__ . '/../content/webid-table-row.html');
 
         $webIdsInfo = array_map(function ($info) use ($template) {
-            $isAdmin = in_array($info['webid'], $this->adminWebIds, true);
+            $isAdmin = $this->adminSession->isAdmin($info['webid']);
             $isDongleRegistered = $info['api_key'];
             $webIdHas = $this->hashUrl($info['webid'], 'sha1');
 
@@ -256,42 +240,9 @@ HTML;
         return $WebIdsHtml;
     }
 
-    private function isValidCsrfToken(RequestInterface $request): bool
-    {
-        $isValid = false;
-        $body = $request->getParsedBody();
-
-        if (is_array($body)) {
-            $provided = $body['csrf'] ?? null;
-            $stored = $this->session->get(self::SESSION_KEY_CSRF_TOKEN);
-
-            if (is_string($provided) && is_string($stored) && $provided !== '' && $stored !== '') {
-                $isValid = hash_equals($stored, $provided);
-            }
-        }
-
-        if ($isValid) {
-            $this->session->remove(self::SESSION_KEY_CSRF_TOKEN);
-        }
-
-        return $isValid;
-    }
-
     private function handleInvalidCsrf()
     {
         return $this->errorResponse->forbidden('Invalid CSRF token','Invalid or missing CSRF token for admin action.');
-    }
-
-    private function getOrCreateCsrfToken(): string
-    {
-        $token = $this->session->get(self::SESSION_KEY_CSRF_TOKEN);
-
-        if (! is_string($token) || $token === '') {
-            $token = bin2hex(random_bytes(32));
-            $this->session->set(self::SESSION_KEY_CSRF_TOKEN, $token);
-        }
-
-        return $token;
     }
 
     private function handleLogin(RequestInterface $request)
@@ -306,7 +257,7 @@ HTML;
         }
 
         // CSRF validation required before authentication attempt
-        if (! $this->isValidCsrfToken($request)) {
+        if (! $this->hasValidCsrf($request)) {
             return $this->errorResponse->forbidden('Invalid CSRF token','Invalid or missing CSRF token. Please try again from the admin page.');
         }
 
@@ -328,5 +279,21 @@ HTML;
         }
 
         return $response;
+    }
+
+    private function hasValidCsrf(RequestInterface $request): bool
+    {
+        $isValid = false;
+
+        $body = $request->getParsedBody();
+
+        if (is_array($body)
+            && isset($body['csrf'])
+            && $this->adminSession->csrfTokenIsValid($body['csrf'])
+        ) {
+            $isValid = true;
+        }
+
+        return $isValid;
     }
 }
