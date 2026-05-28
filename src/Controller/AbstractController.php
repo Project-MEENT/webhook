@@ -24,7 +24,7 @@ abstract class AbstractController
 
     final protected function createContent(string $title, string $description, string $body = '', $scripts = null): string
     {
-        $context = array_merge(AbstractController::EMPTY_CONTENT, [
+        $context = array_merge(self::EMPTY_CONTENT, [
             'header' => $description,
             'main' => $body,
             'title' => $title,

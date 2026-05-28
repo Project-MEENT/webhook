@@ -180,13 +180,8 @@ switch ($rootPath) {
     break;
 
     default:
-        $response['content'] = [[
-            'detail' => 'The requested resource "' . $request->getUri()->getPath() . '" was not found on this server.',
-            'pointer' => '#not-found',
-        ]];
-        $response['status'] = 404;
-        $response['type'] = '/errors/';
-        $response['title'] = 'Not found';
+        $path = $request->getUri()->getPath();
+        $response = $errorResponse->notFound('Not found',"The requested resource '$path' was not found on this server.");
     break;
 }
 

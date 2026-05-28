@@ -68,10 +68,7 @@ class ApiController extends AbstractController
                 if ($version >= 0.4) {
                     $response = $this->handleConsentRequest($request);
                 } else {
-                    $response = [
-                        'status' => 200,
-                        'title' => '',
-                    ];
+                    $response = $this->handleNotFound($request);
                 }
             break;
             case self::SUBJECT_DATA:
@@ -382,7 +379,7 @@ class ApiController extends AbstractController
             return $response;
         }
 
-        $isInvalidPath = strpos($filePath, '/') === false || ! str_ends_with($filePath, '.data');
+        $isInvalidPath = ! str_contains($filePath, '/') || ! str_ends_with($filePath, '.data');
         if ($isInvalidPath) {
             $response = $this->errorResponse->badRequest('Invalid path','Invalid path');
         } elseif (! $this->filesystem->fileExists($filePath)) {

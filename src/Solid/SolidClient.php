@@ -290,10 +290,10 @@ class SolidClient
 
         try {
             return $this->httpClient->send($resourceRequest);
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            throw SolidException::create("Could not fetch resource '$resourceUrl'", $e);
+        } catch (\Psr\Http\Client\RequestExceptionInterface $e) {
+            $message = $e->getResponse()->getBody()->getContents();
+            throw SolidException::create("Could not fetch resource '$resourceUrl': $message", $e);
         }
-
     }
 
     final public function storeResource($webIdUrl, $resourceUrl, $resource = null, $contentType = null)
@@ -310,8 +310,9 @@ class SolidClient
 
         try {
             return $this->httpClient->send($putRequest);
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            throw SolidException::create("Could not store resource '$resourceUrl'", $e);
+        } catch (\Psr\Http\Client\RequestExceptionInterface $e) {
+            $message = $e->getResponse()->getBody()->getContents();
+            throw SolidException::create("Could not store resource '$resourceUrl': $message", $e);
         }
     }
 
