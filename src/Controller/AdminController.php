@@ -49,7 +49,10 @@ class AdminController extends AbstractController
             }
 
             if (isset($queryParams['error'])) {
-                $response = $this->errorResponse->badGateway('Solid login error','The Solid provider returned an error: ' . urldecode((string) $queryParams['error']));
+                $response = $this->errorResponse->badGateway(
+                    'Solid login error',
+                    'The Solid provider returned an error: ' . urldecode((string) $queryParams['error'])
+                );
             } elseif (isset($queryParams['code'])) {
                 $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
                 $authenticatedWebId = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
@@ -57,7 +60,10 @@ class AdminController extends AbstractController
                 if (! $this->adminSession->isAdmin($authenticatedWebId)) {
                     $this->adminSession->stop();
 
-                    $response = $this->errorResponse->forbidden('Unauthorized admin WebID','The authenticated WebID is not allowed to access the admin area: ' . $authenticatedWebId);
+                    $response = $this->errorResponse->forbidden(
+                        'Unauthorized admin WebID',
+                        'The authenticated WebID is not allowed to access the admin area: ' . $authenticatedWebId
+                    );
                 } else {
                     $this->adminSession->start($authenticatedWebId);
 
@@ -164,7 +170,7 @@ class AdminController extends AbstractController
                                     $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
                                     $response = [
                                         'headers' => ['Location' => [$redirectUri]],
-                                        'status' =>  302,
+                                        'status' => 302,
                                     ];
                                 }
                             break;
@@ -179,7 +185,10 @@ class AdminController extends AbstractController
                 }
             }
         } catch (\Throwable $exception) {
-            $response = $this->errorResponse->badGateway('Admin Solid login failed','Failed to complete admin Solid login: ' . $exception->getMessage());
+            $response = $this->errorResponse->badGateway(
+                'Admin Solid login failed',
+                'Failed to complete admin Solid login: ' . $exception->getMessage()
+            );
         }
 
         if (! isset($response['type'])) {
@@ -195,7 +204,7 @@ class AdminController extends AbstractController
 
         return str_replace(
             '</form>',
-            '<input name="csrf" type="hidden" value="' . $csrfToken .'" /></form>',
+            '<input name="csrf" type="hidden" value="' . $csrfToken . '" /></form>',
             $formContents,
         );
     }
@@ -221,7 +230,7 @@ class AdminController extends AbstractController
 
         $implode = implode('', $webIdsInfo);
 
-        $WebIdsHtml = <<<"HTML"
+        return <<<"HTML"
             <table class="webid-info">
                 <thead>
                 <tr>
@@ -236,13 +245,11 @@ class AdminController extends AbstractController
                 <tbody>$implode</tbody>
             </table>
 HTML;
-
-        return $WebIdsHtml;
     }
 
     private function handleInvalidCsrf()
     {
-        return $this->errorResponse->forbidden('Invalid CSRF token','Invalid or missing CSRF token for admin action.');
+        return $this->errorResponse->forbidden('CSRF Error', 'Invalid or missing CSRF token.');
     }
 
     private function handleLogin(RequestInterface $request)
@@ -253,16 +260,23 @@ HTML;
         // WebID is required when POSTing to /admin/login
         if (! is_string($requestedWebId) || $requestedWebId === '') {
             // @TODO: Check or change the title/pointer inconsistency.
-            return $this->errorResponse->badRequest('Missing WebID','WebID is required to initiate admin authentication.','#webid-required');
+            return $this->errorResponse->badRequest(
+                'Missing WebID',
+                'WebID is required to initiate admin authentication.',
+                '#webid-required'
+            );
         }
 
         // CSRF validation required before authentication attempt
         if (! $this->hasValidCsrf($request)) {
-            return $this->errorResponse->forbidden('Invalid CSRF token','Invalid or missing CSRF token. Please try again from the admin page.');
+            return $this->handleInvalidCsrf();
         }
 
         if (! filter_var($requestedWebId, FILTER_VALIDATE_URL)) {
-            return $this->errorResponse->unprocessableEntity('Invalid WebID URL','The provided WebID is not a valid URL: ' . htmlentities($requestedWebId));
+            return $this->errorResponse->unprocessableEntity(
+                'Invalid WebID URL',
+                'The provided WebID is not a valid URL: ' . htmlentities($requestedWebId)
+            );
         }
 
         // Proceed with Solid authentication
@@ -270,11 +284,15 @@ HTML;
 
         if (empty($redirectUri)) {
             // @TODO: Check or change the title/pointer inconsistency.
-            $response = $this->errorResponse->badGateway('Solid login failed','Could not create a Solid authorization redirect for the provided WebID.','#solid-login-redirect-failed');
+            $response = $this->errorResponse->badGateway(
+                'Solid login failed',
+                'Could not create a Solid authorization redirect for the provided WebID.',
+                '#solid-login-redirect-failed'
+            );
         } else {
             $response = [
                 'headers' => ['Location' => [$redirectUri]],
-                'status' =>  302,
+                'status' => 302,
             ];
         }
 
