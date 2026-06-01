@@ -367,14 +367,14 @@ class ApiController extends AbstractController
 
         $filePath = $this->getRequestedObject($request);
         if (! empty($apiKey)) {
-            $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
+            $webIdUrl = $this->filesystem->read('keys/' . $apiKey . '.key');
         } elseif (isset($queryParams['webid'])) {
-            $webId = $queryParams['webid'];
+            $webIdUrl = $queryParams['webid'];
         } else {
-            $webId = null;
+            $webIdUrl = null;
         }
 
-        if ($webId) {
+        if ($webIdUrl) {
             $storageUrls = $this->solidClient->fetchStorageUrls($webId);
 
             if ($storageUrls !== []) {
@@ -393,7 +393,7 @@ class ApiController extends AbstractController
             ]);
 
             try {
-                $solidResponse = $this->solidClient->fetchResource($webId, $resourceUrl);
+                $solidResponse = $this->solidClient->fetchResource($webIdUrl, $resourceUrl);
             } catch (SolidException $e) {
                 return $this->errorResponse->badGateway('Error fetching resource from Solid Pod','Error fetching resource from Solid Pod: ' . $e->getMessage(), '#solid-fetch-error');
             }
@@ -450,7 +450,7 @@ class ApiController extends AbstractController
         } else {
             // Check which Solid Pod to write to
             if (isset($apiKey)) {
-                $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
+                $webIdUrl = $this->filesystem->read('keys/' . $apiKey . '.key');
             }
 
             $message = 'Records written';
@@ -464,7 +464,7 @@ class ApiController extends AbstractController
                 if ($version >= 0.3) {
                     // When data is received, it is stored in `/{webid-hash}/{timestamp}.{id}.data`
                     $filePath = vsprintf("%s/%s.%s.data", [
-                        'webIdHash' => $this->hashUrl($webId, 'sha1'),
+                        'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
                         'timestamp' => $timestamp,
                         $id,
                     ]);
@@ -500,7 +500,7 @@ class ApiController extends AbstractController
 
                         // @FIXME: Read StorageUrl from persistent configuration instead of resolving it on every request.
                         if (empty($storageUrl)) {
-                            $storageUrls = $this->solidClient->fetchStorageUrls($webId);
+                            $storageUrls = $this->solidClient->fetchStorageUrls($webIdUrl);
 
                             if ($storageUrls !== []) {
                                 // @KLUDGE: As there is no user available here, we cannot ask them which storage to use
@@ -534,7 +534,7 @@ class ApiController extends AbstractController
                         }
 
                         try {
-                            $result = $this->solidClient->storeResource($webId, $url, $turtle, 'text/turtle');
+                            $result = $this->solidClient->storeResource($webIdUrl, $url, $turtle, 'text/turtle');
                         } catch (SolidException $e) {
                             return $this->errorResponse->badGateway('Solid write error','Could not write resource to Solid Pod: ' . $e->getMessage());
                         }
