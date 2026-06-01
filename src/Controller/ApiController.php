@@ -222,6 +222,31 @@ class ApiController extends AbstractController
                 } elseif ($isRedirect) {
                     $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
                     $webIdUrl = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
+
+                    $storageUrls = $this->solidClient->fetchStorageUrls($webIdUrl);
+
+                    if ($storageUrls === []) {
+                        return $this->errorResponse->unprocessableEntity('No Storage URL',
+                            'No Storage URL found for the WebID, cannot write data to Solid Pod');
+                    // } else if (count($storageUrls) > 1) {
+                    // @FIXME: Instead of using the first URL, the user should be asked which one to use
+                    } else {
+                        $storageUrl = reset($storageUrls);
+                    }
+
+                    $containerUrl = vsprintf('%s/%s/', [
+                        'root' => rtrim($storageUrl, '/'),
+                        'path' => 'MEENT/p1',
+                    ]);
+
+                    $solidResponse = $this->solidClient->storeResource(
+                        $webIdUrl,
+                        rtrim($containerUrl, '/') . '/README.md',
+                        'This Container is where all P1 dongle data is written.'
+                    );
+
+                    // @FIXME: Store $storageUrl (where?)
+
                     $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
                 } elseif (! $webIdUrl) {
                     $form = file_get_contents(__DIR__ . '/../content/forms/consent.html');
