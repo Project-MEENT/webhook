@@ -375,13 +375,10 @@ class ApiController extends AbstractController
         }
 
         if ($webIdUrl) {
-            $storageUrls = $this->solidClient->fetchStorageUrls($webId);
-
-            if ($storageUrls !== []) {
-                // @TODO: Instead of using the first URL, the user should be asked which one to use when registering
-                $storageUrlRoot = reset($storageUrls);
-                $storageUrl = rtrim($storageUrlRoot, '/');
-            }
+            $storageFilePath = vsprintf('/storage-urls/%s.url', [
+                'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
+            ]);
+            $storageUrl = $this->filesystem->read($storageFilePath);
 
             if (empty($storageUrl)) {
                 return $this->errorResponse->unprocessableEntity('No Storage URL','No Storage URL found for the WebID, cannot read data from Solid Pod');
@@ -498,20 +495,13 @@ class ApiController extends AbstractController
                         $dateTime->setTimezone(new \DateTimeZone('Europe/Amsterdam'));
                         $timestamp = $dateTime->format('Ymd.His');
 
-                        // @FIXME: Read StorageUrl from persistent configuration instead of resolving it on every request.
+                        $storageFilePath = vsprintf('/storage-urls/%s.url', [
+                            'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
+                        ]);
+                        $storageUrl = $this->filesystem->read($storageFilePath);
+
                         if (empty($storageUrl)) {
-                            $storageUrls = $this->solidClient->fetchStorageUrls($webIdUrl);
-
-                            if ($storageUrls !== []) {
-                                // @KLUDGE: As there is no user available here, we cannot ask them which storage to use
-                                $storageUrlRoot = reset($storageUrls);
-                                $storageUrl = rtrim($storageUrlRoot, '/');
-                                // @FIXME: Store $storageUrl (where?)
-                            }
-
-                            if (empty($storageUrl)) {
-                                return $this->errorResponse->unprocessableEntity('No Storage URL','No Storage URL found for the WebID, cannot store data in Solid Pod');
-                            }
+                            return $this->errorResponse->unprocessableEntity('No Storage URL','No Storage URL found for the WebID, cannot store data in Solid Pod');
                         }
 
                         $url = vsprintf('%s/%s/%s/%s', [
