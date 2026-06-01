@@ -245,7 +245,10 @@ class ApiController extends AbstractController
                         'This Container is where all P1 dongle data is written.'
                     );
 
-                    // @FIXME: Store $storageUrl (where?)
+                    $storageFilePath = vsprintf('/storage-urls/%s.url', [
+                        'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
+                    ]);
+                    $this->filesystem->write($storageFilePath, $storageUrl);
 
                     $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
                 } elseif (! $webIdUrl) {
