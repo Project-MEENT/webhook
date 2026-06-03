@@ -38,157 +38,36 @@ class AdminController extends AbstractController
 
     final public function handleRequest(RequestInterface $request)
     {
-        try {
-            $method = $request->getMethod();
-            $parts = $this->splitUriPath($request);
-            $queryParams = $request->getQueryParams();
+        $parts = $this->splitUriPath($request);
+        $queryParams = $request->getQueryParams();
 
-            $subject = '';
-            if (($parts[0] ?? null) === 'admin') {
-                $subject = $parts[1] ?? self::SUBJECT_ROOT;
-            }
+        $subject = '';
+        if (($parts[0] ?? null) === 'admin') {
+            $subject = $parts[1] ?? self::SUBJECT_ROOT;
+        }
 
-            if (isset($queryParams['error'])) {
-                $response = $this->errorResponse->badGateway(
-                    'Solid login error',
-                    'The Solid provider returned an error: ' . urldecode((string) $queryParams['error'])
-                );
-            } elseif (isset($queryParams['code'])) {
-                $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
-                $authenticatedWebId = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
-
-                if (! $this->adminSession->isAdmin($authenticatedWebId)) {
-                    $this->adminSession->stop();
-
-                    $response = $this->errorResponse->forbidden(
-                        'Unauthorized admin WebID',
-                        'The authenticated WebID is not allowed to access the admin area: ' . $authenticatedWebId
-                    );
-                } else {
-                    $this->adminSession->start($authenticatedWebId);
-
-                    $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
-                    $response = [
-                        'headers' => ['Location' => [$redirectUri]],
-                        'status' => 302,
-                    ];
-                }
-            } else {
-                switch ($subject) {
-                    case self::SUBJECT_ROOT:
-                        switch ($method) {
-                            case 'HEAD':
-                            case 'OPTIONS':
-                                $response = $this->handleAllowedHttpMethods(['GET']);
-                            break;
-                            case 'GET':
-                                $adminWebId = $this->adminSession->isAuthenticated();
-
-                                if ($adminWebId) {
-                                    $logoutForm = $this->getContents('forms/admin-logout');
-                                    $logoutForm = $this->addCsrfToForm($logoutForm);
-                                    $logoutForm = str_replace(['{webid}'], [$adminWebId], $logoutForm);
-
-                                    $webIds = $this->webIdInformation->getAll();
-                                    if ($webIds === []) {
-                                        $WebIdsHtml = '<p><em>No WebIDs found.</em></p>';
-                                    } else {
-                                        $WebIdsHtml = $this->createInfoTable($webIds);
-                                    }
-
-                                    $content = $this->createContent(
-                                        'Admin dashboard',
-                                        $logoutForm,
-                                        "<section>$WebIdsHtml</section>",
-                                        [
-                                            'forms/check-solid-connection.js',
-                                            'forms/show-password.js',
-                                        ],
-                                    );
-
-                                    $response = [
-                                        'content' => $content,
-                                        'status' => 200,
-                                        'title' => '',
-                                    ];
-                                } else {
-                                    $webId = htmlentities($queryParams['webid'] ?? '');
-
-                                    $loginForm = file_get_contents(__DIR__ . '/../content/forms/admin-login.html');
-                                    $loginForm = $this->addCsrfToForm($loginForm);
-                                    $loginForm = str_replace(['{webid}'], [$webId], $loginForm);
-
-                                    $content = $this->createContent(
-                                        'Admin login',
-                                        '<p>Admin access requires logging in with a Solid WebID.</p>',
-                                        '<section>' . $loginForm . '</section>',
-                                    );
-
-                                    $response = ['content' => $content, 'status' => 200, 'title' => ''];
-                                }
-                            break;
-                            default:
-                                $response = $this->handleMethodNotAllowed($request, ['GET']);
-                            break;
-                        }
-                    break;
-                    case self::SUBJECT_LOGIN:
-                        switch ($method) {
-                            case 'HEAD':
-                            case 'OPTIONS':
-                                $response = $this->handleAllowedHttpMethods(['POST', 'GET']);
-                            break;
-                            case 'GET':
-                                // GET /admin/login redirects to /admin/ (the form is there)
-                                $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
-                                $response = [
-                                    'headers' => ['Location' => [$redirectUri]],
-                                    'status' => 302,
-                                ];
-                            break;
-                            case 'POST':
-                                $response = $this->handleLogin($request);
-                            break;
-                            default:
-                                $response = $this->handleMethodNotAllowed($request, ['POST', 'GET']);
-                            break;
-                        }
-                    break;
-                    case self::SUBJECT_LOGOUT:
-                        switch ($method) {
-                            case 'HEAD':
-                            case 'OPTIONS':
-                                $response = $this->handleAllowedHttpMethods(['POST']);
-                            break;
-                            case 'POST':
-                                if (! $this->hasValidCsrf($request)) {
-                                    $response = $this->handleInvalidCsrf();
-                                } else {
-                                    $this->adminSession->stop();
-                                    session_regenerate_id(true);
-
-                                    $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
-                                    $response = [
-                                        'headers' => ['Location' => [$redirectUri]],
-                                        'status' => 302,
-                                    ];
-                                }
-                            break;
-                            default:
-                                $response = $this->handleMethodNotAllowed($request, ['POST']);
-                            break;
-                        }
-                    break;
-                    default:
-                        $response = $this->handleNotFound($request);
-                    break;
-                }
-            }
-        } catch (\Throwable $exception) {
+        if (isset($queryParams['error'])) {
             $response = $this->errorResponse->badGateway(
-                'Admin Solid login failed',
-                'Failed to complete admin Solid login: ' . $exception->getMessage()
+                'Solid login error',
+                'The Solid provider returned an error: ' . urldecode((string) $queryParams['error'])
             );
+        } elseif (isset($queryParams['code'])) {
+            $response = $this->handleRedirectRequest($request);
+        } else {
+            switch ($subject) {
+                case self::SUBJECT_ROOT:
+                    $response = $this->handleRootRequest($request);
+                break;
+                case self::SUBJECT_LOGIN:
+                    $response = $this->handleLoginRequest($request);
+                break;
+                case self::SUBJECT_LOGOUT:
+                    $response = $this->handleLogoutRequest($request);
+                break;
+                default:
+                    $response = $this->handleNotFound($request);
+                break;
+            }
         }
 
         if (! isset($response['type'])) {
@@ -294,6 +173,154 @@ HTML;
                 'headers' => ['Location' => [$redirectUri]],
                 'status' => 302,
             ];
+        }
+
+        return $response;
+    }
+
+    private function handleLoginRequest(RequestInterface $request): array
+    {
+        $method = $request->getMethod();
+
+        switch ($method) {
+            case 'HEAD':
+            case 'OPTIONS':
+                $response = $this->handleAllowedHttpMethods(['POST', 'GET']);
+            break;
+            case 'GET':
+                // GET /admin/login redirects to /admin/ (the form is there)
+                $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
+                $response = [
+                    'headers' => ['Location' => [$redirectUri]],
+                    'status' => 302,
+                ];
+            break;
+            case 'POST':
+                $response = $this->handleLogin($request);
+            break;
+            default:
+                $response = $this->handleMethodNotAllowed($request, ['POST', 'GET']);
+            break;
+        }
+
+        return $response;
+    }
+
+    private function handleLogoutRequest(RequestInterface $request)
+    {
+        $method = $request->getMethod();
+
+        switch ($method) {
+            case 'HEAD':
+            case 'OPTIONS':
+                $response = $this->handleAllowedHttpMethods(['POST']);
+            break;
+            case 'POST':
+                if (! $this->hasValidCsrf($request)) {
+                    $response = $this->handleInvalidCsrf();
+                } else {
+                    $this->adminSession->stop();
+                    session_regenerate_id(true);
+
+                    $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
+                    $response = [
+                        'headers' => ['Location' => [$redirectUri]],
+                        'status' => 302,
+                    ];
+                }
+            break;
+            default:
+                $response = $this->handleMethodNotAllowed($request, ['POST']);
+            break;
+        }
+
+        return $response;
+    }
+
+    private function handleRedirectRequest(RequestInterface $request)
+    {
+        $queryParams = $request->getQueryParams();
+        $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
+        $authenticatedWebId = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
+
+        if (! $this->adminSession->isAdmin($authenticatedWebId)) {
+            $this->adminSession->stop();
+
+            $response = $this->errorResponse->forbidden(
+                'Unauthorized admin WebID',
+                'The authenticated WebID is not allowed to access the admin area: ' . $authenticatedWebId
+            );
+        } else {
+            $this->adminSession->start($authenticatedWebId);
+
+            $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
+            $response = [
+                'headers' => ['Location' => [$redirectUri]],
+                'status' => 302,
+            ];
+        }
+
+        return $response;
+    }
+
+    private function handleRootRequest(RequestInterface $request): array
+    {
+        $method = $request->getMethod();
+
+        switch ($method) {
+            case 'HEAD':
+            case 'OPTIONS':
+                $response = $this->handleAllowedHttpMethods(['GET']);
+            break;
+            case 'GET':
+                $adminWebId = $this->adminSession->isAuthenticated();
+
+                if ($adminWebId) {
+                    $logoutForm = $this->getContents('forms/admin-logout');
+                    $logoutForm = $this->addCsrfToForm($logoutForm);
+                    $logoutForm = str_replace(['{webid}'], [$adminWebId], $logoutForm);
+
+                    $webIds = $this->webIdInformation->getAll();
+                    if ($webIds === []) {
+                        $WebIdsHtml = '<p><em>No WebIDs found.</em></p>';
+                    } else {
+                        $WebIdsHtml = $this->createInfoTable($webIds);
+                    }
+
+                    $content = $this->createContent(
+                        'Admin dashboard',
+                        $logoutForm,
+                        "<section>$WebIdsHtml</section>",
+                        [
+                            'forms/check-solid-connection.js',
+                            'forms/show-password.js',
+                        ],
+                    );
+
+                    $response = [
+                        'content' => $content,
+                        'status' => 200,
+                        'title' => '',
+                    ];
+                } else {
+                    $webId = htmlentities($queryParams['webid'] ?? '');
+
+                    $loginForm = file_get_contents(__DIR__ . '/../content/forms/admin-login.html');
+                    $loginForm = $this->addCsrfToForm($loginForm);
+                    $loginForm = str_replace(['{webid}'], [$webId], $loginForm);
+
+                    $content = $this->createContent(
+                        'Admin login',
+                        '<p>Admin access requires logging in with a Solid WebID.</p>',
+                        '<section>' . $loginForm . '</section>',
+                    );
+
+                    $response = ['content' => $content, 'status' => 200, 'title' => ''];
+                }
+            break;
+            default:
+                $response = $this->handleMethodNotAllowed($request, ['GET']);
+            break;
         }
 
         return $response;
