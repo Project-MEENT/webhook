@@ -4,7 +4,7 @@ namespace Meent\WebHook\Controller;
 
 use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception\RuntimeException;
-use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 abstract class AbstractController
 {
@@ -20,7 +20,7 @@ abstract class AbstractController
 
     protected ErrorResponse $errorResponse;
 
-    abstract public function handleRequest(RequestInterface $request);
+    abstract public function handleRequest(ServerRequestInterface $request);
 
     final protected function createContent(string $title, string $description, string $body = '', $scripts = null): string
     {
@@ -88,14 +88,14 @@ abstract class AbstractController
         );
     }
 
-    final protected function handleNotFound(RequestInterface $request)
+    final protected function handleNotFound(ServerRequestInterface $request)
     {
         $requestUri = $request->getUri()->getPath();
 
         return $this->errorResponse->notFound('Not found',"The requested resource '$requestUri' was not found on this server.");
     }
 
-    final protected function splitUriPath(RequestInterface $request): array
+    final protected function splitUriPath(ServerRequestInterface $request): array
     {
         $path = $request->getUri()->getPath();
 

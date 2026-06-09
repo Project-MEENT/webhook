@@ -10,7 +10,7 @@ use Meent\WebHook\Session;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
 use Meent\WebHook\WebIdInformation;
-use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 class AdminController extends AbstractController
 {
@@ -42,7 +42,7 @@ class AdminController extends AbstractController
         $this->webIdInformation = $webIdInformation;
     }
 
-    final public function handleRequest(RequestInterface $request)
+    final public function handleRequest(ServerRequestInterface $request)
     {
         $parts = $this->splitUriPath($request);
         $queryParams = $request->getQueryParams();
@@ -140,7 +140,7 @@ HTML;
         return $this->errorResponse->forbidden('CSRF Error', 'Invalid or missing CSRF token.');
     }
 
-    private function handleLogin(RequestInterface $request)
+    private function handleLogin(ServerRequestInterface $request)
     {
         $body = $request->getParsedBody();
         $requestedWebId = $body['webid'] ?? null;
@@ -187,7 +187,7 @@ HTML;
         return $response;
     }
 
-    private function handleLoginRequest(RequestInterface $request): array
+    private function handleLoginRequest(ServerRequestInterface $request): array
     {
         $method = $request->getMethod();
 
@@ -215,7 +215,7 @@ HTML;
         return $response;
     }
 
-    private function handleLogoutRequest(RequestInterface $request)
+    private function handleLogoutRequest(ServerRequestInterface $request)
     {
         $method = $request->getMethod();
 
@@ -246,7 +246,7 @@ HTML;
         return $response;
     }
 
-    private function handleManageRequest(RequestInterface $request)
+    private function handleManageRequest(ServerRequestInterface $request)
     {
         $allowedMethods = ['POST'];
         $method = $request->getMethod();
@@ -271,7 +271,7 @@ HTML;
         return $response;
     }
 
-    private function handleRedirectRequest(RequestInterface $request)
+    private function handleRedirectRequest(ServerRequestInterface $request)
     {
         $queryParams = $request->getQueryParams();
         $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
@@ -297,7 +297,7 @@ HTML;
         return $response;
     }
 
-    private function handleRootRequest(RequestInterface $request): array
+    private function handleRootRequest(ServerRequestInterface $request): array
     {
         $method = $request->getMethod();
 
@@ -362,7 +362,7 @@ HTML;
         return $response;
     }
 
-    private function handleUpdateAdminsRequest(RequestInterface $request): array
+    private function handleUpdateAdminsRequest(ServerRequestInterface $request): array
     {
         $body = $request->getParsedBody();
         $webid = $this->normalizeUrl($body['webid']);
@@ -393,7 +393,7 @@ HTML;
         return $response;
     }
 
-    private function hasValidCsrf(RequestInterface $request): bool
+    private function hasValidCsrf(ServerRequestInterface $request): bool
     {
         $isValid = false;
 

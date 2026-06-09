@@ -4,7 +4,7 @@ namespace Meent\WebHook\Controller;
 
 use League\CommonMark\ConverterInterface;
 use Meent\WebHook\ErrorResponse;
-use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 class DocsController extends AbstractController
 {
@@ -19,7 +19,7 @@ class DocsController extends AbstractController
         $this->errorResponse = $errorResponse;
     }
 
-    final public function handleRequest(RequestInterface $request)
+    final public function handleRequest(ServerRequestInterface $request)
     {
         $converter = $this->converter;
 
@@ -111,7 +111,7 @@ class DocsController extends AbstractController
         return $response;
     }
 
-    private function getRequestedSubject(RequestInterface $request)
+    private function getRequestedSubject(ServerRequestInterface $request)
     {
         $parts = $this->splitUriPath($request);
 

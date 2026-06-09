@@ -12,7 +12,7 @@ use Meent\WebHook\Record;
 use Meent\WebHook\Session;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
-use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 class ApiController extends AbstractController
 {
@@ -54,7 +54,7 @@ class ApiController extends AbstractController
         $this->solidClient = $solidClient;
     }
 
-    final public function handleRequest(RequestInterface $request)
+    final public function handleRequest(ServerRequestInterface $request)
     {
         try {
             $subject = $this->getRequestedSubject($request);
@@ -97,7 +97,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function checkAuthorization(RequestInterface $request)
+    private function checkAuthorization(ServerRequestInterface $request)
     {
         $auth = $request->getHeaderLine('Authorization');
 
@@ -117,7 +117,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function getBaseUrl(RequestInterface $request)
+    private function getBaseUrl(ServerRequestInterface $request)
     {
         return $request->getUri()->getScheme() . '://'
             . $request->getUri()->getHost()
@@ -133,7 +133,7 @@ class ApiController extends AbstractController
         return end($versions);
     }
 
-    private function getRequestedObject(RequestInterface $request)
+    private function getRequestedObject(ServerRequestInterface $request)
     {
         $subject = $this->getRequestedSubject($request);
         $path = $request->getUri()->getPath();
@@ -144,7 +144,7 @@ class ApiController extends AbstractController
         return ltrim($object, '/');
     }
 
-    private function getRequestedSubject(RequestInterface $request)
+    private function getRequestedSubject(ServerRequestInterface $request)
     {
         $parts = $this->splitUriPath($request);
 
@@ -167,7 +167,7 @@ class ApiController extends AbstractController
         return $subject;
     }
 
-    private function getRequestedVersion(RequestInterface $request)
+    private function getRequestedVersion(ServerRequestInterface $request)
     {
         $parts = $this->splitUriPath($request);
 
@@ -195,7 +195,7 @@ class ApiController extends AbstractController
         return (float) ltrim($version, 'v');
     }
 
-    private function handleConsentRequest(RequestInterface $request)
+    private function handleConsentRequest(ServerRequestInterface $request)
     {
         $requestMethod = $request->getMethod();
         $queryParams = $request->getQueryParams();
@@ -298,7 +298,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function handleDataRequest(RequestInterface $request)
+    private function handleDataRequest(ServerRequestInterface $request)
     {
         $requestMethod = $request->getMethod();
         $version = $this->getRequestedVersion($request);
@@ -334,7 +334,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function handleDataGet(RequestInterface $request)
+    private function handleDataGet(ServerRequestInterface $request)
     {
         $version = $this->getRequestedVersion($request);
         $queryParams = $request->getQueryParams();
@@ -420,7 +420,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function handleDataPost(RequestInterface $request, $input)
+    private function handleDataPost(ServerRequestInterface $request, $input)
     {
         $version = $this->getRequestedVersion($request);
 
@@ -569,7 +569,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function handleRegisterPost(RequestInterface $request)
+    private function handleRegisterPost(ServerRequestInterface $request)
     {
         $input = $request->getBody()->getContents();
         $version = $this->getRequestedVersion($request);
@@ -618,7 +618,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function handleRegisterRequest(RequestInterface $request)
+    private function handleRegisterRequest(ServerRequestInterface $request)
     {
         $requestMethod = $request->getMethod();
         $queryParams = $request->getQueryParams();
@@ -679,7 +679,7 @@ class ApiController extends AbstractController
         return $response;
     }
 
-    private function handleRootRequest(RequestInterface $request)
+    private function handleRootRequest(ServerRequestInterface $request)
     {
         $uriRoot = $this->getBaseUrl($request);
         $apiRoot = $uriRoot . '/api/';
