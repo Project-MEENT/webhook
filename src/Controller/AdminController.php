@@ -99,7 +99,7 @@ class AdminController extends AbstractController
 
     private function createInfoTable(array $webIds): string
     {
-        $template = file_get_contents(__DIR__ . '/../content/webid-table-row.html');
+        $template = $this->getContents('webid-table-row');
 
         $webIdsInfo = array_map(function ($info) use ($template) {
             $isAdmin = $this->adminSession->isAdmin($info['webid']);
@@ -155,11 +155,6 @@ HTML;
             );
         }
 
-        // CSRF validation required before authentication attempt
-        if (! $this->hasValidCsrf($request)) {
-            return $this->handleInvalidCsrf();
-        }
-
         if (! filter_var($requestedWebId, FILTER_VALIDATE_URL)) {
             return $this->errorResponse->unprocessableEntity(
                 'Invalid WebID URL',
@@ -189,12 +184,13 @@ HTML;
 
     private function handleLoginRequest(ServerRequestInterface $request): array
     {
+        $allowedMethods = ['POST', 'GET'];
         $method = $request->getMethod();
 
         switch ($method) {
             case 'HEAD':
             case 'OPTIONS':
-                $response = $this->handleAllowedHttpMethods(['POST', 'GET']);
+                $response = $this->handleAllowedHttpMethods($allowedMethods);
             break;
             case 'GET':
                 // GET /admin/login redirects to /admin/ (the form is there)
@@ -205,10 +201,14 @@ HTML;
                 ];
             break;
             case 'POST':
-                $response = $this->handleLogin($request);
+                if (! $this->hasValidCsrf($request)) {
+                    $response = $this->handleInvalidCsrf();
+                } else {
+                    $response = $this->handleLogin($request);
+                }
             break;
             default:
-                $response = $this->handleMethodNotAllowed($request, ['POST', 'GET']);
+                $response = $this->handleMethodNotAllowed($request, $allowedMethods);
             break;
         }
 
@@ -217,12 +217,13 @@ HTML;
 
     private function handleLogoutRequest(ServerRequestInterface $request)
     {
+        $allowedMethods = ['POST'];
         $method = $request->getMethod();
 
         switch ($method) {
             case 'HEAD':
             case 'OPTIONS':
-                $response = $this->handleAllowedHttpMethods(['POST']);
+                $response = $this->handleAllowedHttpMethods($allowedMethods);
             break;
             case 'POST':
                 if (! $this->hasValidCsrf($request)) {
@@ -239,7 +240,7 @@ HTML;
                 }
             break;
             default:
-                $response = $this->handleMethodNotAllowed($request, ['POST']);
+                $response = $this->handleMethodNotAllowed($request, $allowedMethods);
             break;
         }
 
@@ -299,12 +300,13 @@ HTML;
 
     private function handleRootRequest(ServerRequestInterface $request): array
     {
+        $allowedMethods = ['GET'];
         $method = $request->getMethod();
 
         switch ($method) {
             case 'HEAD':
             case 'OPTIONS':
-                $response = $this->handleAllowedHttpMethods(['GET']);
+                $response = $this->handleAllowedHttpMethods($allowedMethods);
             break;
             case 'GET':
                 $adminWebId = $this->adminSession->isAuthenticated();
@@ -339,9 +341,10 @@ HTML;
                         'title' => '',
                     ];
                 } else {
-                    $webId = htmlentities($queryParams['webid'] ?? '');
+                    $queryParams = $request->getQueryParams();
 
-                    $loginForm = file_get_contents(__DIR__ . '/../content/forms/admin-login.html');
+                    $webId = htmlentities($queryParams['webid'] ?? '');
+                    $loginForm = $this->getContents('forms/admin-login');
                     $loginForm = $this->addCsrfToForm($loginForm);
                     $loginForm = str_replace(['{webid}'], [$webId], $loginForm);
 
@@ -355,7 +358,7 @@ HTML;
                 }
             break;
             default:
-                $response = $this->handleMethodNotAllowed($request, ['GET']);
+                $response = $this->handleMethodNotAllowed($request, $allowedMethods);
             break;
         }
 
