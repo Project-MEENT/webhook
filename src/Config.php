@@ -69,7 +69,7 @@ class Config
         return $instance;
     }
 
-    public function get(string $key)
+    final public function get(string $key)
     {
         $availableKeys = array_merge(
             array_keys($this->requiredKeys),
