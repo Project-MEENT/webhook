@@ -163,7 +163,8 @@ switch ($rootPath) {
             $session,
             $adminSession,
             $webIdInformationService,
-            $errorResponse
+            $errorResponse,
+            $config
         );
 
         $response = $controller->handleRequest($request);

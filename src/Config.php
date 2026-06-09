@@ -2,6 +2,8 @@
 
 namespace Meent\WebHook;
 
+use Meent\WebHook\Exception\RuntimeException;
+
 class Config
 {
     public const KEY_ADMIN_WEBIDS = 'admin_webids';
@@ -16,6 +18,7 @@ class Config
     private const ERROR_CONFIG_NOT_ARRAY = 'Provided config file must return an array.';
     private const ERROR_FILE_NOT_EXISTS = 'Provided config file "%s" does not exist.';
     private const ERROR_MISSING_REQUIRED_KEYS = 'Missing required config key(s): %s.';
+    private const ERROR_SAVE_FAILED = 'Failed to save config';
     private const ERROR_UNKNOWN_KEY = 'Unknown config key "%s". Available keys are: %s.';
 
     private array $config = [];
@@ -46,7 +49,12 @@ class Config
         if (! is_array($config)) {
             throw new \RuntimeException(self::ERROR_CONFIG_NOT_ARRAY);
         } else {
-            return self::fromArray($config);
+            $configObject = self::fromArray($config);
+
+            $configObject->config['filepath'] = $filePath;
+            $configObject->optionalKeys['filepath'] = 'Path to where the config file is stored';
+
+            return $configObject;
         }
     }
 
@@ -78,6 +86,55 @@ class Config
         }
 
         return $this->config[$key] ?? null;
+    }
+
+    // @FIXME: Save should not live here, neither should $config['filepath']
+    final public function save(array $config)
+    {
+        $this->validateArray($config);
+
+        if (isset($this->config['filepath'])) {
+            $filePath = $this->config['filepath'];
+
+            $backupPath = vsprintf('%s.bak-%s', [
+                $filePath,
+                date('YmdHis'),
+            ]);
+            $copy = copy($filePath, $backupPath);
+
+            if ($copy) {
+                unset($config['filepath']);
+                ksort($config);
+
+                $content = vsprintf('<?php return %s;', [
+                    var_export($config, true),
+                ]);
+
+                $success = file_put_contents($filePath, $content) !== false;
+
+                if ($success) {
+                    // Force filesystem (and optionally opcode) cache to update
+                    clearstatcache(true, $filePath);
+                    if (function_exists('opcache_invalidate')) {
+                        opcache_invalidate($filePath, true);
+                    }
+
+                    $this->config = array_merge($this->config, $config);
+                } else {
+                    throw RuntimeException::create(self::ERROR_SAVE_FAILED .': could not save file to ' . $filePath);
+                }
+
+            } else {
+                throw RuntimeException::create(self::ERROR_SAVE_FAILED .': could not create backup of existing config');
+            }
+        } else {
+            throw RuntimeException::create(self::ERROR_SAVE_FAILED .': no filepath present');
+        }
+    }
+
+    final public function toArray(): array
+    {
+        return $this->config;
     }
 
     private function validateArray(array $config)

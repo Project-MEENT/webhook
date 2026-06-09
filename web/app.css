@@ -98,9 +98,23 @@ form[action$="logout"] {
     width: fit-content;
 }
 
+form[action="/admin/manage"] button,
 form[action$="logout"] button {
     margin-left: 1rem;
     padding: 0.15rem;
+}
+
+
+form[action="/admin/manage"] {
+    align-items: center;
+    border: none;
+    box-shadow: none;
+    display: flex;
+    flex-direction: row;
+    margin: 0;
+    min-width: 0;
+    padding: 0;
+    width: fit-content;
 }
 
 /*============================================================================*/

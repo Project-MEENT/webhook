@@ -3,7 +3,9 @@
 namespace Meent\WebHook\Controller;
 
 use Meent\WebHook\AdminSession;
+use Meent\WebHook\Config;
 use Meent\WebHook\ErrorResponse;
+use Meent\WebHook\Exception\InvalidArgumentException;
 use Meent\WebHook\Session;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
@@ -16,8 +18,10 @@ class AdminController extends AbstractController
 
     private const SUBJECT_LOGIN = 'login';
     private const SUBJECT_LOGOUT = 'logout';
+    private const SUBJECT_MANAGE = 'manage';
 
     private AdminSession $adminSession;
+    private Config $config;
     private Session $session;
     private SolidClient $solidClient;
     private WebIdInformation $webIdInformation;
@@ -28,8 +32,10 @@ class AdminController extends AbstractController
         AdminSession $adminSession,
         WebIdInformation $webIdInformation,
         ErrorResponse $errorResponse,
+        Config $config
     ) {
         $this->adminSession = $adminSession;
+        $this->config = $config;
         $this->errorResponse = $errorResponse;
         $this->session = $session;
         $this->solidClient = $solidClient;
@@ -63,6 +69,9 @@ class AdminController extends AbstractController
                 break;
                 case self::SUBJECT_LOGOUT:
                     $response = $this->handleLogoutRequest($request);
+                break;
+                case self::SUBJECT_MANAGE:
+                    $response = $this->handleManageRequest($request);
                 break;
                 default:
                     $response = $this->handleNotFound($request);
@@ -237,6 +246,31 @@ HTML;
         return $response;
     }
 
+    private function handleManageRequest(RequestInterface $request)
+    {
+        $allowedMethods = ['POST'];
+        $method = $request->getMethod();
+
+        switch ($method) {
+            case 'HEAD':
+            case 'OPTIONS':
+                $response = $this->handleAllowedHttpMethods($allowedMethods);
+            break;
+            case 'POST':
+                if (! $this->hasValidCsrf($request)) {
+                    $response = $this->handleInvalidCsrf();
+                } else {
+                    $response = $this->handleUpdateAdminsRequest($request);
+                }
+            break;
+            default:
+                $response = $this->handleMethodNotAllowed($request, $allowedMethods);
+            break;
+        }
+
+        return $response;
+    }
+
     private function handleRedirectRequest(RequestInterface $request)
     {
         $queryParams = $request->getQueryParams();
@@ -286,12 +320,14 @@ HTML;
                     } else {
                         $WebIdsHtml = $this->createInfoTable($webIds);
                     }
+                    $WebIdsHtml = $this->addCsrfToForm($WebIdsHtml);
 
                     $content = $this->createContent(
                         'Admin dashboard',
                         $logoutForm,
                         "<section>$WebIdsHtml</section>",
                         [
+                            'forms/admin.js',
                             'forms/check-solid-connection.js',
                             'forms/show-password.js',
                         ],
@@ -322,6 +358,37 @@ HTML;
                 $response = $this->handleMethodNotAllowed($request, ['GET']);
             break;
         }
+
+        return $response;
+    }
+
+    private function handleUpdateAdminsRequest(RequestInterface $request): array
+    {
+        $body = $request->getParsedBody();
+        $webid = $this->normalizeUrl($body['webid']);
+        $makeAdmin = isset($body['makeAdmin']) && $body['makeAdmin'] === 'on';
+
+        $webIds = $this->config->get(Config::KEY_ADMIN_WEBIDS);
+        $config = $this->config->toArray();
+
+        if ($makeAdmin && ! in_array($webid, $webIds, true)) {
+            $webIds[] = $webid;
+        } elseif (! $makeAdmin && in_array($webid, $webIds, true)) {
+            $webIds = array_diff($webIds, [$webid]);
+
+            if ($webIds === []) {
+                throw InvalidArgumentException::create('Cannot remove WebID as there would be no admin left');
+            }
+        }
+
+        if ($webIds !== $this->config->get(Config::KEY_ADMIN_WEBIDS)) {
+            $config[Config::KEY_ADMIN_WEBIDS] = array_values($webIds);
+            $this->config->save($config);
+        }
+
+        $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
+
+        $response = ['headers' => ['Location' => [$redirectUri]], 'status' => 303,];
 
         return $response;
     }
