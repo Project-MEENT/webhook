@@ -8,8 +8,8 @@ class Config
 {
     public const KEY_ADMIN_WEBIDS = 'admin_webids';
     public const KEY_API_STORAGE_PATH = 'api_storage_path';
-    public const KEY_INITIAL_ACCESS_TOKEN = 'client_initial_access_token';
     public const KEY_CLIENT_NAME = 'client_name';
+    public const KEY_INITIAL_ACCESS_TOKEN = 'client_initial_access_token';
     public const KEY_JWT_TTL = 'jwt_ttl';
     public const KEY_METADATA_CACHE_TTL = 'metadata_cache_ttl';
     public const KEY_SOLID_STORAGE_PATH = 'solid_storage_path';

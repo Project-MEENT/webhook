@@ -91,7 +91,7 @@ if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
             (string) $baseUrl->withPath('/api/consent'),
             (string) $baseUrl->withPath('/admin'),
         ],
-        // @TODO: Add client_id when explicitly configured (static registration or Client URI "${clientServer}/${clientConfigFile}")
+        clientId: $baseUrl->withPath('/' . OidcClientConfig::METADATA_FILE)->__toString(),
         // @TODO: Add initialAccessToken: $config->get(Config::KEY_INITIAL_ACCESS_TOKEN),
     );
 
@@ -116,6 +116,14 @@ if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
 }
 
 switch ($rootPath) {
+    case OidcClientConfig::METADATA_FILE:
+        $response = [
+            'content' => $clientFilesystem->read(OidcClientConfig::METADATA_FILE),
+            'headers' => ['Content-Type' => ['application/json']],
+            'status' => 200,
+        ];
+    break;
+
     case 'api':
         $solidClientConfig = new SolidClientConfig(
             useCsrf: true,

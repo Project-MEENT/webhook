@@ -4,7 +4,7 @@ namespace Meent\WebHook\Solid;
 
 class OidcClientConfig
 {
-    public const METADATA_FILE = 'client_metadata.json';
+    public const METADATA_FILE = 'client_id.json';
 
     public const REQUIRE_NEW_AUTHENTICATION = false;
     public const REUSE_STORED_AUTHENTICATION = true;
