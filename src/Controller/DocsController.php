@@ -19,7 +19,7 @@ class DocsController extends AbstractController
         $this->errorResponse = $errorResponse;
     }
 
-    final public function handleRequest(ServerRequestInterface $request)
+    final public function handleRequest(ServerRequestInterface $request): array
     {
         $converter = $this->converter;
 

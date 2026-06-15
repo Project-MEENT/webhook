@@ -42,7 +42,7 @@ class AdminController extends AbstractController
         $this->webIdInformation = $webIdInformation;
     }
 
-    final public function handleRequest(ServerRequestInterface $request)
+    final public function handleRequest(ServerRequestInterface $request): array
     {
         $parts = $this->splitUriPath($request);
         $queryParams = $request->getQueryParams();

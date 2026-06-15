@@ -6,7 +6,7 @@ use Meent\WebHook\Exception\SolidException;
 
 class Utility
 {
-    final public static function base64UrlDecode($encodedData)
+    final public static function base64UrlDecode($encodedData): string
     {
         $padding = (4 - strlen($encodedData) % 4) % 4;
         $encodedPayload = strtr($encodedData, '-_', '+/') . str_repeat('=', $padding);

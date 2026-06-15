@@ -8,7 +8,7 @@ class Session
 
     private function __construct() {}
 
-    final public static function current()
+    final public static function current(): static
     {
         if (! isset(self::$instance)) {
             self::$instance = new self;

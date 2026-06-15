@@ -75,7 +75,7 @@ class SolidClient
         }
     }
 
-    final public function fetchStorageUrls($webIdUrl)
+    final public function fetchStorageUrls($webIdUrl): array
     {
         if (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
             throw SolidException::create("Provided WebID '$webIdUrl' is not a valid URL");
@@ -112,7 +112,7 @@ class SolidClient
         return $storageUrls;
     }
 
-    final public function connectWebId($webIdUrl, Session $session)
+    final public function connectWebId($webIdUrl, Session $session): string
     {
         $redirectAuthorizationUri = '';
 
@@ -296,7 +296,7 @@ class SolidClient
         }
     }
 
-    final public function storeResource($webIdUrl, $resourceUrl, $resource = null, $contentType = null)
+    final public function storeResource($webIdUrl, $resourceUrl, $resource = null, $contentType = null): ResponseInterface
     {
         if (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
             throw SolidException::create("Provided WebID '$webIdUrl' is not a valid URL");
@@ -316,7 +316,7 @@ class SolidClient
         }
     }
 
-    final public function isWebIdConnected($webIdUrl)
+    final public function isWebIdConnected($webIdUrl): bool
     {
         $issuer = $this->createIssuerFromWebIdUrl($webIdUrl);
 
@@ -373,7 +373,7 @@ class SolidClient
         }
     }
 
-    private function createOidcClientFromIssuer(IssuerInterface $issuer)
+    private function createOidcClientFromIssuer(IssuerInterface $issuer): OidcClientInterface
     {
         $registeredClaims = $this->getClaims($issuer);
 

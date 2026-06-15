@@ -6,7 +6,7 @@ use Meent\WebHook\Exception\RuntimeException;
 
 trait UrlHashTrait
 {
-    final public function hashUrl($url, $algorithm)
+    final public function hashUrl($url, $algorithm): string
     {
         $data = $this->normalizeUrl($url);
 

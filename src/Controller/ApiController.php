@@ -55,7 +55,7 @@ class ApiController extends AbstractController
         $this->solidClient = $solidClient;
     }
 
-    final public function handleRequest(ServerRequestInterface $request)
+    final public function handleRequest(ServerRequestInterface $request): array
     {
         try {
             $subject = $this->getRequestedSubject($request);

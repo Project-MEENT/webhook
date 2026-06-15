@@ -81,7 +81,7 @@ class AdminSession
         return $adminWebId;
     }
 
-    final public function start(string $authenticatedWebId)
+    final public function start(string $authenticatedWebId): void
     {
         session_regenerate_id(true);
 
@@ -89,7 +89,7 @@ class AdminSession
         $this->session->set(self::SESSION_KEY_AUTHENTICATED_WEBID, $this->normalizeUrl($authenticatedWebId));
     }
 
-    final public function stop()
+    final public function stop(): void
     {
         $this->session->remove(self::SESSION_KEY_AUTHENTICATED_WEBID);
         $this->session->remove(self::SESSION_KEY_AUTHENTICATED_AT);
