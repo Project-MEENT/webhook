@@ -92,7 +92,6 @@ $outputType = match ($accept[0]) {
     default => 'json',
 };
 
-
 $pathParts = array_values(
     array_filter(
         explode('/', $request->getUri()->getPath())

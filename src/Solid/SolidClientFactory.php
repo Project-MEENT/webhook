@@ -41,7 +41,7 @@ class SolidClientFactory
 
     private Config $config;
     private FilesystemOperator $filesystem;
-    private OidcClientConfig  $oidcClientConfig;
+    private OidcClientConfig $oidcClientConfig;
 
     //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
