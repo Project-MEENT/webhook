@@ -55,15 +55,8 @@ class SolidClientFactory
         $this->oidcClientConfig = $oidcClientConfig;
     }
 
-    final public function create(SolidClientConfig $solidClientConfig): SolidClient
+    final public function create(SolidClientConfig $solidClientConfig, array $httpClientConfig): SolidClient
     {
-        $httpClientConfig = [
-            // Allow self-signed certificates for local development
-            // 'verify' => false,
-            // 'verify_host' => false,
-            // 'verify_peer' => false,
-        ];
-
         $dpopJwkFile = self::DPOP_JWK_FILE;
         $useCsrf = true;
         $usePkce = true;
@@ -78,6 +71,7 @@ class SolidClientFactory
         $oidcClientBuilder = $this->createOidcClientBuilder($dpopAuthMethodFactory, $httpClient);
 
         $registrationServiceBuilder = new RegistrationServiceBuilder();
+        $registrationServiceBuilder->setHttpClient($httpClient);
         $registration = $registrationServiceBuilder->build();
 
         $authorizationService = $this->createAuthorizationServiceBuild($httpClient);

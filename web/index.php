@@ -25,6 +25,8 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 $config = Config::fromFile(__DIR__ . '/../config.php');
 
+$httpClientConfig = [];
+
 // Create FileSystems
 $dataFileSystemAdapter = new LocalFilesystemAdapter($config->get('api_storage_path'));
 $dataFilesystem = new Filesystem($dataFileSystemAdapter);
@@ -137,7 +139,7 @@ switch ($rootPath) {
         ]);
 
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
-        $solidClient = $solidClientFactory->create($solidClientConfig);
+        $solidClient = $solidClientFactory->create($solidClientConfig, $httpClientConfig);
 
         $controller = new ApiController(
             $dataFilesystem,
@@ -164,7 +166,7 @@ switch ($rootPath) {
         ]);
 
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
-        $solidClient = $solidClientFactory->create($solidClientConfig);
+        $solidClient = $solidClientFactory->create($solidClientConfig, $httpClientConfig);
         $webIdInformationService = new WebIdInformation($clientFilesystem, $dataFilesystem);
 
         $controller = new AdminController(
