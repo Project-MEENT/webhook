@@ -3,9 +3,6 @@
 namespace Meent\WebHook;
 
 use League\Flysystem\FilesystemOperator;
-use Meent\WebHook\Solid\OidcClientConfig;
-use Meent\WebHook\Solid\SolidClient;
-use Meent\WebHook\Solid\SolidClientFactory;
 use Meent\WebHook\Solid\Utility;
 
 class WebIdInformation
@@ -13,13 +10,6 @@ class WebIdInformation
     ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     use UrlHashTrait;
-
-    private const IGNORE_FILES = [
-        'client_id.json',
-        OidcClientConfig::METADATA_FILE,
-        SolidClient::ISSUER_METADATA_FILE,
-        SolidClientFactory::DPOP_JWK_FILE,
-    ];
 
     private FilesystemOperator $clientFilesystem;
     private FilesystemOperator $dataFilesystem;
@@ -89,18 +79,20 @@ class WebIdInformation
 
         $directoryList = $this->clientFilesystem->listContents('/', true)->toArray();
 
-        array_walk($directoryList, function($item) use (&$webIds) {
+        array_walk($directoryList, function ($item) use (&$webIds) {
             $path = $item->path();
 
-            if (
-                $item->isFile()
-                && str_ends_with($path, '.json')
-                && ! in_array(basename($path), self::IGNORE_FILES, true)
-            ) {
+            if ($item->isFile() && str_ends_with($path, '.json')) {
                 $json = $this->clientFilesystem->read($path);
                 $data = Utility::jsonDecode($json);
 
-                $webIds[] = $this->normalizeUrl($data['solid_webid']);
+                if (
+                    isset($data['solid_webid'])
+                    && is_string($data['solid_webid'])
+                    && filter_var($data['solid_webid'], FILTER_VALIDATE_URL)
+                ) {
+                    $webIds[] = $this->normalizeUrl($data['solid_webid']);
+                }
             }
         });
 
