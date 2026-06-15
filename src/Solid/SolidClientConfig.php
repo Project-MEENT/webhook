@@ -2,52 +2,44 @@
 
 namespace Meent\WebHook\Solid;
 
-final class SolidClientConfig
+use Meent\WebHook\AbstractConfig;
+
+class SolidClientConfig extends AbstractConfig
 {
-    private string $redirectUri;
-    private string $stateSigningKey;
-    private int $expirationTime;
-    private bool $useCsrf;
-    private bool $usePkce;
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-    public function __construct(
-        bool $useCsrf,
-        bool $usePkce,
-        int $expirationTime,
-        string $stateSigningKey,
-        string $redirectUri,
-    ) {
-        $this->stateSigningKey = $stateSigningKey;
-        $this->expirationTime = $expirationTime;
-        $this->useCsrf = $useCsrf;
-        // For certain issuers (like https://solidcommunity.net) PKCE is required, even for server-to-server calls.
-        // @FIXME: PKCE use should be stored in the server offline grant or metadata JSON.
-        $this->usePkce = $usePkce;
-        $this->redirectUri = $redirectUri;
+    final public const EXPIRATION_TIME = 'expiration_time';
+    final public const REDIRECT_URI = 'redirect_uri';
+    final public const STATE_SIGNING_KEY = 'state_signing_key';
+    final public const USE_CSRF = 'use_csrf';
+    final public const USE_PKCE = 'use_pkce';
+
+    //////////////////////////// GETTERS AND SETTERS \\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+    protected function getOptionalKeys(): array
+    {
+        return [
+            self::USE_CSRF => '(bool) ',
+            self::USE_PKCE => '(bool) ',
+        ];
     }
 
-    public function expirationTime(): int
+    protected function getRequiredKeys(): array
     {
-        return $this->expirationTime;
+        return [
+            self::EXPIRATION_TIME => '(int) ',
+            self::REDIRECT_URI => '(string) ',
+            self::STATE_SIGNING_KEY => '(string) ',
+        ];
     }
 
-    public function redirectUri(): string
-    {
-        return $this->redirectUri;
-    }
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-    public function stateSigningKey(): string
+    final public function __construct($values)
     {
-        return $this->stateSigningKey;
-    }
+        $values[self::USE_CSRF] = $values[self::USE_CSRF] ?? true;
+        $values[self::USE_PKCE] = $values[self::USE_PKCE] ?? true;
 
-    public function useCsrf(): bool
-    {
-        return $this->useCsrf;
-    }
-
-    public function usePkce(): bool
-    {
-        return $this->usePkce;
+        $this->setValues($values);
     }
 }

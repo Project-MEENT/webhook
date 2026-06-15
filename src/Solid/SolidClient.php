@@ -177,7 +177,7 @@ class SolidClient
         // In callback mode, issuer is recovered exclusively from signed state.
 
         // CSRF: validate state matches what we sent (OIDC Core Section 3.1.2.7).
-        if ($this->config->useCsrf() === true) {
+        if ($this->config->get(SolidClientConfig::USE_CSRF) === true) {
             $expectedState = $session->get('oauth_state');
 
             if ($state !== $expectedState) {
@@ -207,7 +207,7 @@ class SolidClient
         // The token request must include a DPoP header with a valid proof JWT (see RFC9449 Section 4.2 for proof syntax).
 
         $codeVerifier = null;
-        if ($this->config->usePkce() === true) {
+        if ($this->config->get(SolidClientConfig::USE_PKCE) === true) {
             /*/ rfc7636 - PKCE - Section 4.5.  Client Sends the Authorization Code and the Code Verifier to the Token Endpoint /*/
             $codeVerifier = $session->get('pkce_code_verifier');
             $hasValidCodeVerifier = is_string($codeVerifier) && $codeVerifier !== '';
@@ -380,7 +380,7 @@ class SolidClient
         // @KLUDGE: The OIDC Client library send the first redirect_uri, ignoring
         //          regardless of which redirect_uri has been set in the grant.
         //          So we need to make sure the desired URL is the first in the array.
-        $redirectUri = $this->config->redirectUri();
+        $redirectUri = $this->config->get(SolidClientConfig::REDIRECT_URI);
 
         $registeredClaims['redirect_uris'] = array_filter($registeredClaims['redirect_uris'] ?? [], static function ($uri) use ($redirectUri) {
             return $uri !== $redirectUri;
@@ -398,7 +398,7 @@ class SolidClient
 
     private function getClaims(IssuerInterface $issuer): array
     {
-        $localClientId = $this->oidcConfig->clientId();
+        $localClientId = $this->oidcConfig->get(OidcClientConfig::CLIENT_ID);
 
         if (is_string($localClientId) && filter_var($localClientId, FILTER_VALIDATE_URL)) {
             // Client ID Document mode: use the local config directly, no registration.
@@ -539,24 +539,24 @@ class SolidClient
         $header = Utility::base64UrlJsonEncode(['alg' => 'HS256', 'typ' => 'JWT']);
 
         $payload = Utility::base64UrlJsonEncode([
-            'exp' => time() + $this->config->expirationTime(),
+            'exp' => time() + $this->config->get(SolidClientConfig::EXPIRATION_TIME),
             'issr' => $issuerUrl,
         ]);
 
-        $signature = Utility::createSignature($header . '.' . $payload, $this->config->stateSigningKey());
+        $signature = Utility::createSignature($header . '.' . $payload, $this->config->get(SolidClientConfig::STATE_SIGNING_KEY));
         $state = vsprintf("%s.%s.%s", [
             $header,
             $payload,
             $signature
         ]);
 
-        if ($this->config->useCsrf() === true) {
+        if ($this->config->get(SolidClientConfig::USE_CSRF) === true) {
             $session->set('oauth_state', $state);
         }
 
         $authorizationRequestParams['state'] = $state;
 
-        if ($this->config->usePkce() === true) {
+        if ($this->config->get(SolidClientConfig::USE_PKCE) === true) {
             /*/ rfc7636 - PKCE - Section 4.1.  Client Creates a Code Verifier /*/
             // 32 random bytes base64url-encoded → 43-char verifier in the allowed unreserved set.
             $codeVerifier = Utility::base64UrlEncode(random_bytes(32));
@@ -594,7 +594,7 @@ class SolidClient
             $header = Utility::base64UrlJsonDecode($parts[0]);
             $payload = Utility::base64UrlJsonDecode($parts[1]);
 
-            $expectedSignature = Utility::createSignature($parts[0] . '.' . $parts[1], $this->config->stateSigningKey());
+            $expectedSignature = Utility::createSignature($parts[0] . '.' . $parts[1], $this->config->get(SolidClientConfig::STATE_SIGNING_KEY));
 
             if (! is_array($header) || ($header['alg'] ?? null) !== 'HS256') {
                 $error = 'State JWT must use HS256';
@@ -635,7 +635,7 @@ class SolidClient
             'redirect_uri' => $redirectUrl,
         ];
 
-        if ($this->config->usePkce() === true && is_string($codeVerifier) && $codeVerifier !== '') {
+        if ($this->config->get(SolidClientConfig::USE_PKCE) === true && is_string($codeVerifier) && $codeVerifier !== '') {
             $params['code_verifier'] = $codeVerifier;
         }
 
@@ -771,8 +771,7 @@ class SolidClient
         $clientConfig = $this->oidcConfig->toArray();
         // Register oidcClient with the issuer (dynamic registration; cached per-issuer hash).
         try {
-            // @TODO: If the issuer requires pre-registration, an initial access token (provided during registration on the oidcClient) can be provided here.
-            return $this->registration->register($issuer, $clientConfig, $this->oidcConfig->initialAccessToken());
+            return $this->registration->register($issuer, $clientConfig, $this->oidcConfig->get(OidcClientConfig::INITIAL_ACCESS_TOKEN));
         } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
             // InvalidArgumentException(Issuer does not support dynamic oidcClient registration)
             // RuntimeException(Unable to encode oidcClient metadata | Unable to register OpenID oidcClient | Registration response did not return a client_id field)

@@ -3,39 +3,49 @@
 namespace Meent\WebHook;
 
 use Meent\WebHook\Exception\RuntimeException;
+use Meent\WebHook\Solid\OidcClientConfig;
 
-class Config
+class Config extends AbstractConfig
 {
-    public const KEY_ADMIN_WEBIDS = 'admin_webids';
-    public const KEY_API_STORAGE_PATH = 'api_storage_path';
-    public const KEY_CLIENT_NAME = 'client_name';
-    public const KEY_INITIAL_ACCESS_TOKEN = 'client_initial_access_token';
-    public const KEY_JWT_TTL = 'jwt_ttl';
-    public const KEY_METADATA_CACHE_TTL = 'metadata_cache_ttl';
-    public const KEY_SOLID_STORAGE_PATH = 'solid_storage_path';
-    public const KEY_STATE_SIGNING_KEY = 'state_signing_key';
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
+    final public const ADMIN_WEBIDS = 'admin_webids';
+    final public const API_STORAGE_PATH = 'api_storage_path';
+    final public const CLIENT_NAME = 'client_name';
+    final public const JWT_TTL = 'jwt_ttl';
+    final public const METADATA_CACHE_TTL = 'metadata_cache_ttl';
+    final public const SOLID_STORAGE_PATH = 'solid_storage_path';
+    final public const STATE_SIGNING_KEY = 'state_signing_key';
+
+    //////////////////////////// GETTERS AND SETTERS \\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+    final protected function getRequiredKeys(): array
+    {
+        return [
+            self::ADMIN_WEBIDS => 'List of allowed admin WebID URLs',
+            self::API_STORAGE_PATH => 'Used for persistent storage of data posted to the API',
+            self::CLIENT_NAME => 'Name of the OIDC client to register with the OP',
+            self::JWT_TTL => 'Expiration time of OAuth state JWTs, in seconds.',
+            self::METADATA_CACHE_TTL => 'Expiration time of the OIDC metadata cache, in seconds',
+            self::SOLID_STORAGE_PATH => 'Used for persistent storage of Solid Client and Issuer metadata, DPoP keys, and OAuth state JWTs.',
+            self::STATE_SIGNING_KEY => 'Secret key used to sign OAuth state JWTs. Should be a long random string, and kept secret.',
+        ];
+    }
+
+    final protected function getOptionalKeys(): array
+    {
+        return [
+            OidcClientConfig::INITIAL_ACCESS_TOKEN => 'Initial Access Token for dynamic client registration (optional, only needed if the OP requires it)',
+        ];
+    }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+    // @FIXME: Save should not live here, neither should $this->filepath
+
+    private string $filepath;
     private const ERROR_CONFIG_NOT_ARRAY = 'Provided config file must return an array.';
     private const ERROR_FILE_NOT_EXISTS = 'Provided config file "%s" does not exist.';
-    private const ERROR_MISSING_REQUIRED_KEYS = 'Missing required config key(s): %s.';
     private const ERROR_SAVE_FAILED = 'Failed to save config';
-    private const ERROR_UNKNOWN_KEY = 'Unknown config key "%s". Available keys are: %s.';
-
-    private array $config = [];
-
-    private $optionalKeys = [
-        self::KEY_INITIAL_ACCESS_TOKEN => 'Initial Access Token for dynamic client registration (optional, only needed if the OP requires it)',
-    ];
-
-    private $requiredKeys = [
-        self::KEY_ADMIN_WEBIDS => 'List of allowed admin WebID URLs',
-        self::KEY_API_STORAGE_PATH => 'Used for persistent storage of data posted to the API',
-        self::KEY_CLIENT_NAME => 'MEENT Solid P1 Dongle Webhook',
-        self::KEY_JWT_TTL => 'Expiration time of OAuth state JWTs, in seconds.',
-        self::KEY_METADATA_CACHE_TTL => 'Expiration time of the OIDC metadata cache, in seconds',
-        self::KEY_SOLID_STORAGE_PATH => 'Used for persistent storage of Solid Client and Issuer metadata, DPoP keys, and OAuth state JWTs.',
-        self::KEY_STATE_SIGNING_KEY => 'Secret key used to sign OAuth state JWTs. Should be a long random string, and kept secret.',
-    ];
 
     final public static function fromFile(string $filePath): self
     {
@@ -49,52 +59,20 @@ class Config
         if (! is_array($config)) {
             throw RuntimeException::create(self::ERROR_CONFIG_NOT_ARRAY);
         } else {
-            $configObject = self::fromArray($config);
+            $configObject = static::fromArray($config);
 
-            $configObject->config['filepath'] = $filePath;
-            $configObject->optionalKeys['filepath'] = 'Path to where the config file is stored';
+            $configObject->filepath = $filePath;
 
             return $configObject;
         }
     }
 
-    final public static function fromArray(array $config): self
-    {
-        $instance = new self();
-
-        $instance->validateArray($config);
-
-        $instance->config = $config;
-
-        return $instance;
-    }
-
-    final public function get(string $key)
-    {
-        $availableKeys = array_merge(
-            array_keys($this->requiredKeys),
-            array_keys($this->optionalKeys),
-        );
-
-        if (! in_array($key, $availableKeys, true)) {
-            $message = vsprintf(self::ERROR_UNKNOWN_KEY, [
-                $key,
-                implode(', ', $availableKeys),
-            ]);
-
-            throw RuntimeException::create($message);
-        }
-
-        return $this->config[$key] ?? null;
-    }
-
-    // @FIXME: Save should not live here, neither should $config['filepath']
+    // @FIXME: Save should not live here, neither should $this->filepath
     final public function save(array $config)
     {
-        $this->validateArray($config);
-
-        if (isset($this->config['filepath'])) {
-            $filePath = $this->config['filepath'];
+        if (! empty($this->filepath)) {
+            $values = $this->toArray();
+            $filePath = $this->filepath;
 
             $backupPath = vsprintf('%s.bak-%s', [
                 $filePath,
@@ -103,7 +81,6 @@ class Config
             $copy = copy($filePath, $backupPath);
 
             if ($copy) {
-                unset($config['filepath']);
                 ksort($config);
 
                 $content = vsprintf('<?php return %s;', [
@@ -119,40 +96,16 @@ class Config
                         opcache_invalidate($filePath, true);
                     }
 
-                    $this->config = array_merge($this->config, $config);
+                    $values = array_merge($values, $config);
+                    $this->setValues($values);
                 } else {
                     throw RuntimeException::create(self::ERROR_SAVE_FAILED .': could not save file to ' . $filePath);
                 }
-
             } else {
                 throw RuntimeException::create(self::ERROR_SAVE_FAILED .': could not create backup of existing config');
             }
         } else {
             throw RuntimeException::create(self::ERROR_SAVE_FAILED .': no filepath present');
         }
-    }
-
-    final public function toArray(): array
-    {
-        return $this->config;
-    }
-
-    private function validateArray(array $config)
-    {
-        $missingKeys = array_diff(array_keys($this->requiredKeys), array_keys($config));
-
-        if (! empty($missingKeys)) {
-            $keys = [];
-            foreach ($missingKeys as $missingKey) {
-                $keys[] = sprintf("%s (%s)", $missingKey, $this->requiredKeys[$missingKey]);
-            }
-
-            $message = vsprintf(self::ERROR_MISSING_REQUIRED_KEYS, [
-                implode(', ', $keys),
-            ]);
-
-            throw RuntimeException::create($message);
-        }
-
     }
 }

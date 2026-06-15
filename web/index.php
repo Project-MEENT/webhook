@@ -38,7 +38,7 @@ $request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, 
 $errorResponse = new ErrorResponse();
 
 $session = Session::current();
-$adminSession = new AdminSession($session, $config->get(Config::KEY_ADMIN_WEBIDS));
+$adminSession = new AdminSession($session, $config->get(Config::ADMIN_WEBIDS));
 
 $acceptHeader = $request->getHeaderLine('Accept');
 
@@ -85,15 +85,21 @@ $baseUrl = $request->getUri()->withPath('')->withFragment('')->withQuery('');
 
 if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
     // Client metadata file not found, creating...
-    $oidcClientConfig = new OidcClientConfig(
-        $config->get(Config::KEY_CLIENT_NAME),
-        redirectUris: [
+    $values = [
+        OidcClientConfig::CLIENT_ID => (string) $baseUrl->withPath('/' . OidcClientConfig::METADATA_FILE),
+        OidcClientConfig::CLIENT_NAME => $config->get(Config::CLIENT_NAME),
+        OidcClientConfig::REDIRECT_URIS => [
             (string) $baseUrl->withPath('/api/consent'),
             (string) $baseUrl->withPath('/admin'),
         ],
-        clientId: $baseUrl->withPath('/' . OidcClientConfig::METADATA_FILE)->__toString(),
-        // @TODO: Add initialAccessToken: $config->get(Config::KEY_INITIAL_ACCESS_TOKEN),
-    );
+    ];
+
+    $initialAccessToken = $config->get(OidcClientConfig::INITIAL_ACCESS_TOKEN);
+    if ($initialAccessToken !== null) {
+        $clientMetadata[OidcClientConfig::INITIAL_ACCESS_TOKEN] = $initialAccessToken;
+    }
+
+    $oidcClientConfig = new OidcClientConfig($values);
 
     $clientMetadataString = json_encode($oidcClientConfig->toArray(),
         JSON_PRETTY_PRINT
@@ -106,13 +112,12 @@ if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
     $clientMetadataString = $clientFilesystem->read(OidcClientConfig::METADATA_FILE);
     $clientMetadata = json_decode($clientMetadataString, true, 512, JSON_THROW_ON_ERROR);
 
-    $oidcClientConfig = new OidcClientConfig(
-        clientName: $clientMetadata['client_name'],
-        redirectUris: $clientMetadata['redirect_uris'],
-        // Keep client_id only when explicitly configured
-        clientId: $clientMetadata['client_id'] ?? null,
-        initialAccessToken: $config->get(Config::KEY_INITIAL_ACCESS_TOKEN)
-    );
+    $initialAccessToken = $config->get(OidcClientConfig::INITIAL_ACCESS_TOKEN);
+    if ($initialAccessToken !== null) {
+        $clientMetadata[OidcClientConfig::INITIAL_ACCESS_TOKEN] = $initialAccessToken;
+    }
+
+    $oidcClientConfig = OidcClientConfig::fromArray($clientMetadata);
 }
 
 switch ($rootPath) {
@@ -125,13 +130,11 @@ switch ($rootPath) {
     break;
 
     case 'api':
-        $solidClientConfig = new SolidClientConfig(
-            useCsrf: true,
-            usePkce: true,
-            expirationTime: $config->get(Config::KEY_JWT_TTL),
-            stateSigningKey: $config->get(Config::KEY_STATE_SIGNING_KEY),
-            redirectUri: $baseUrl->withPath('/api/consent'),
-        );
+        $solidClientConfig = new SolidClientConfig([
+            SolidClientConfig::EXPIRATION_TIME => $config->get(Config::JWT_TTL),
+            SolidClientConfig::REDIRECT_URI => $baseUrl->withPath('/api/consent'),
+            SolidClientConfig::STATE_SIGNING_KEY => $config->get(Config::STATE_SIGNING_KEY),
+        ]);
 
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
         $solidClient = $solidClientFactory->create($solidClientConfig);
@@ -154,13 +157,11 @@ switch ($rootPath) {
     break;
 
     case 'admin':
-        $solidClientConfig = new SolidClientConfig(
-            useCsrf: true,
-            usePkce: true,
-            expirationTime: $config->get(Config::KEY_JWT_TTL),
-            stateSigningKey: $config->get(Config::KEY_STATE_SIGNING_KEY),
-            redirectUri: $baseUrl->withPath('/admin'),
-        );
+        $solidClientConfig = new SolidClientConfig([
+            SolidClientConfig::EXPIRATION_TIME => $config->get(Config::JWT_TTL),
+            SolidClientConfig::REDIRECT_URI => $baseUrl->withPath('/admin'),
+            SolidClientConfig::STATE_SIGNING_KEY => $config->get(Config::STATE_SIGNING_KEY),
+        ]);
 
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
         $solidClient = $solidClientFactory->create($solidClientConfig);

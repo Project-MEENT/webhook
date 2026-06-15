@@ -371,7 +371,7 @@ HTML;
         $webid = $this->normalizeUrl($body['webid']);
         $makeAdmin = isset($body['makeAdmin']) && $body['makeAdmin'] === 'on';
 
-        $webIds = $this->config->get(Config::KEY_ADMIN_WEBIDS);
+        $webIds = $this->config->get(Config::ADMIN_WEBIDS);
         $config = $this->config->toArray();
 
         if ($makeAdmin && ! in_array($webid, $webIds, true)) {
@@ -384,8 +384,8 @@ HTML;
             }
         }
 
-        if ($webIds !== $this->config->get(Config::KEY_ADMIN_WEBIDS)) {
-            $config[Config::KEY_ADMIN_WEBIDS] = array_values($webIds);
+        if ($webIds !== $this->config->get(Config::ADMIN_WEBIDS)) {
+            $config[Config::ADMIN_WEBIDS] = array_values($webIds);
             $this->config->save($config);
         }
 

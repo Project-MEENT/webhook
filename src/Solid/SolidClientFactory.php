@@ -163,7 +163,7 @@ class SolidClientFactory
         $issuerBuilder = $issuerBuilder->setMetadataProviderBuilder($metadataProviderBuilder);
 
         if ($cache instanceof CacheInterface) {
-            $metadataProviderBuilder->setCache($cache)->setCacheTtl($config->get(Config::KEY_METADATA_CACHE_TTL));
+            $metadataProviderBuilder->setCache($cache)->setCacheTtl($config->get(Config::METADATA_CACHE_TTL));
             // Do not cache JWKS in this PoC:
             // the local dev OP can rotate keys between runs, which causes false
             // "Invalid token signature" failures when stale JWK sets are reused.
