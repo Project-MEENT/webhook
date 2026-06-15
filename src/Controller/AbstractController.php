@@ -40,7 +40,7 @@ abstract class AbstractController
                 $path = __DIR__ . '/../content/' . $script;
 
                 if (! file_exists($path)) {
-                    throw new RuntimeException('Script file not found: ' . $path);
+                    throw RuntimeException::create('Script file not found: ' . $path);
                 }
 
                 $contents = file_get_contents($path);
@@ -60,7 +60,7 @@ abstract class AbstractController
         $contents = file_get_contents($contentPath);
 
         if ($contents === false) {
-            throw new RuntimeException('Error: Failed to read content for "' . $subject . '"');
+            throw RuntimeException::create('Error: Failed to read content for "' . $subject . '"');
         }
 
         return $contents;

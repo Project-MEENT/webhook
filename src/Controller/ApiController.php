@@ -7,6 +7,7 @@ use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\AdminSession;
 use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception;
+use Meent\WebHook\Exception\RuntimeException;
 use Meent\WebHook\Exception\SolidException;
 use Meent\WebHook\Record;
 use Meent\WebHook\Session;
@@ -149,7 +150,7 @@ class ApiController extends AbstractController
         $parts = $this->splitUriPath($request);
 
         if ($parts[0] !== 'api') {
-            throw new Exception('Invalid path');
+            throw RuntimeException::create('Invalid path');
         } elseif (count($parts) === 1) {
             $subject = self::SUBJECT_ROOT;
         } else {
@@ -172,7 +173,7 @@ class ApiController extends AbstractController
         $parts = $this->splitUriPath($request);
 
         if ($parts[0] !== 'api') {
-            throw new Exception('Invalid path');
+            throw RuntimeException::create('Invalid path');
         } elseif (
             (count($parts) === 1 && ! $request->hasHeader('API-Version'))
             || (count($parts) > 1 && ($parts[1] === 'v0' || $parts[1] === 'latest'))
@@ -189,7 +190,7 @@ class ApiController extends AbstractController
         } elseif (in_array($parts[1], self::AVAILABLE_SUBJECTS, true)) {
             $version = $this->getLatestVersion();
         } else {
-            throw new Exception('Invalid version');
+            throw RuntimeException::create('Invalid version');
         }
 
         return (float) ltrim($version, 'v');

@@ -2,6 +2,8 @@
 
 namespace Meent\WebHook\Solid;
 
+use Meent\WebHook\Exception\SolidException;
+
 class Utility
 {
     final public static function base64UrlDecode($encodedData)
@@ -11,7 +13,7 @@ class Utility
         $data = base64_decode($encodedPayload, true);
 
         if ($data === false) {
-            throw new \InvalidArgumentException('State contains invalid base64url data');
+            throw SolidException::create('State contains invalid base64url data');
         }
 
         return $data;

@@ -41,13 +41,13 @@ class Config
     {
         if (! file_exists($filePath)) {
             $message = vsprintf(self::ERROR_FILE_NOT_EXISTS, [$filePath]);
-            throw new \RuntimeException($message);
+            throw RuntimeException::create($message);
         }
 
         $config = require $filePath;
 
         if (! is_array($config)) {
-            throw new \RuntimeException(self::ERROR_CONFIG_NOT_ARRAY);
+            throw RuntimeException::create(self::ERROR_CONFIG_NOT_ARRAY);
         } else {
             $configObject = self::fromArray($config);
 
@@ -82,7 +82,7 @@ class Config
                 implode(', ', $availableKeys),
             ]);
 
-            throw new \RuntimeException($message);
+            throw RuntimeException::create($message);
         }
 
         return $this->config[$key] ?? null;
@@ -151,7 +151,7 @@ class Config
                 implode(', ', $keys),
             ]);
 
-            throw new \RuntimeException($message);
+            throw RuntimeException::create($message);
         }
 
     }
