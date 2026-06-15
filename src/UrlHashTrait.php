@@ -13,7 +13,7 @@ trait UrlHashTrait
         return hash($algorithm, $data);
     }
 
-    public function normalizeUrl($url): string
+    final public function normalizeUrl($url): string
     {
         if (! filter_var((string) $url, FILTER_VALIDATE_URL)) {
             throw RuntimeException::create("Provided URL '$url' is not valid");

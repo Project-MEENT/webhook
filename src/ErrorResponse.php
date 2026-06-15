@@ -44,7 +44,7 @@ class ErrorResponse
         return $this->problem($title, $detail ?? $title, 501, $pointer);
     }
 
-    public function proxyAuthenticationRequired($title, $detail = null, $pointer = null): array
+    final public function proxyAuthenticationRequired($title, $detail = null, $pointer = null): array
     {
         return $this->problem($title, $detail ?? $title, 407, $pointer);
     }
