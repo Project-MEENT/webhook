@@ -64,23 +64,13 @@ class AdminController extends AbstractController
         } elseif (isset($queryParams['code'])) {
             $response = $this->handleRedirectRequest($request);
         } else {
-            switch ($subject) {
-                case self::SUBJECT_ROOT:
-                    $response = $this->handleRootRequest($request);
-                break;
-                case self::SUBJECT_LOGIN:
-                    $response = $this->handleLoginRequest($request);
-                break;
-                case self::SUBJECT_LOGOUT:
-                    $response = $this->handleLogoutRequest($request);
-                break;
-                case self::SUBJECT_MANAGE:
-                    $response = $this->handleManageRequest($request);
-                break;
-                default:
-                    $response = $this->handleNotFound($request);
-                break;
-            }
+            $response = match ($subject) {
+                self::SUBJECT_LOGIN => $this->handleLoginRequest($request),
+                self::SUBJECT_LOGOUT => $this->handleLogoutRequest($request),
+                self::SUBJECT_MANAGE => $this->handleManageRequest($request),
+                self::SUBJECT_ROOT => $this->handleRootRequest($request),
+                default => $this->handleNotFound($request),
+            };
         }
 
         if (! isset($response['type'])) {
