@@ -10,6 +10,8 @@ use Meent\WebHook\Solid\Utility;
 
 class WebIdInformation
 {
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     use UrlHashTrait;
 
     private const IGNORE_FILES = [
@@ -21,6 +23,8 @@ class WebIdInformation
 
     private FilesystemOperator $clientFilesystem;
     private FilesystemOperator $dataFilesystem;
+
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(
         FilesystemOperator $clientFilesystem,
@@ -54,6 +58,8 @@ class WebIdInformation
 
         return $information;
     }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     private function getRegisteredWebIds(): array
     {

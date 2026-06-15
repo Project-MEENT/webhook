@@ -8,10 +8,14 @@ use EasyRdf\RdfNamespace;
 
 class Record
 {
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     public const NAMESPACE = 'http://meent.dev.muze.nl/rdf/';
     private const PREFIX = 'meent';
 
     private Graph $graph;
+
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(Graph $graph)
     {
@@ -26,6 +30,8 @@ class Record
 
         return $this->convertRecordToRdf($this->graph, $record, $prefix);
     }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     private function convertRecordToRdf($graph, array $record, $prefix = ''): Graph
     {

@@ -8,10 +8,14 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class DocsController extends AbstractController
 {
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     private const SUBJECT_CONTENT = 'docs';
     private const SUBJECT_ERROR = 'errors';
 
     private ConverterInterface $converter;
+
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(ConverterInterface $converter, ErrorResponse $errorResponse)
     {
@@ -87,6 +91,8 @@ class DocsController extends AbstractController
 
         return $response;
     }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     private function parseMarkdown($markdown)
     {

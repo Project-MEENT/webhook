@@ -35,11 +35,15 @@ use Psr\SimpleCache\CacheInterface;
 
 class SolidClientFactory
 {
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     public const DPOP_JWK_FILE = 'dpop_jwk.json';
 
     private Config $config;
     private FilesystemOperator $filesystem;
     private OidcClientConfig  $oidcClientConfig;
+
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(
         Config $config,
@@ -92,6 +96,8 @@ class SolidClientFactory
             $registration,
         );
     }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     private function createAuthorizationServiceBuild(HttpClient $httpClient): AuthorizationService
     {

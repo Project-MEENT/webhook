@@ -23,6 +23,8 @@ use Psr\Http\Message\ResponseInterface;
 
 class SolidClient
 {
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     use UrlHashTrait;
 
     public const ISSUER_METADATA_FILE = 'issuer_metadata.json';
@@ -38,6 +40,8 @@ class SolidClient
     private OidcClientConfig $oidcConfig;
     private RegistrationService $registration;
     private SolidClientConfig $config;
+
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(
         SolidClientConfig $config,
@@ -324,6 +328,8 @@ class SolidClient
 
         return $this->filesystem->fileExists($offlineGrantFile);
     }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     private function createIssuerFromUrl($issuerUrl): IssuerInterface
     {

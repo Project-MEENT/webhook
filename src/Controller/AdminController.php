@@ -14,6 +14,8 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class AdminController extends AbstractController
 {
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     use UrlHashTrait;
 
     private const SUBJECT_LOGIN = 'login';
@@ -25,6 +27,8 @@ class AdminController extends AbstractController
     private Session $session;
     private SolidClient $solidClient;
     private WebIdInformation $webIdInformation;
+
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(
         SolidClient $solidClient,
@@ -85,6 +89,8 @@ class AdminController extends AbstractController
 
         return $response;
     }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     private function addCsrfToForm($formContents)
     {

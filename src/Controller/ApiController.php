@@ -17,6 +17,8 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class ApiController extends AbstractController
 {
+    ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     use UrlHashTrait;
 
     private const AVAILABLE_SUBJECTS = [
@@ -40,6 +42,8 @@ class ApiController extends AbstractController
     private FilesystemOperator $filesystem;
     private Session $session;
     private SolidClient $solidClient;
+
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(
         FilesystemOperator $filesystem,
@@ -97,6 +101,8 @@ class ApiController extends AbstractController
 
         return $response;
     }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     private function checkAuthorization(ServerRequestInterface $request)
     {

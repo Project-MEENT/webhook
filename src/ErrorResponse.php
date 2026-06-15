@@ -4,6 +4,8 @@ namespace Meent\WebHook;
 
 class ErrorResponse
 {
+    //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     final public function badGateway($title, $detail = null, $pointer = null): array
     {
         return $this->problem($title, $detail ?? $title, 502, $pointer);
@@ -56,6 +58,8 @@ class ErrorResponse
     {
         return $this->problem($title, $detail ?? $title, 422, $pointer);
     }
+
+    ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     private function pointerFromtitle(string $title)
     {
