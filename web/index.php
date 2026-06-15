@@ -2,6 +2,7 @@
 
 namespace Meent\WebHook;
 
+use GuzzleHttp\HandlerStack;
 use Laminas\Diactoros\ServerRequestFactory;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
@@ -30,6 +31,14 @@ $httpClientConfig = [
         'User-Agent' => $config->get(Config::CLIENT_NAME),
     ]
 ];
+
+if (getenv('ACCEPT_LOCALHOST_DOMAIN') !== '') {
+    // Allow .localhost domains for local development with Docker Compose
+    $httpClientConfig['handler'] = HandlerStack::create();
+    $httpClientConfig['handler']->push(DevelopmentMiddleware::localhost());
+
+    putenv('ACCEPT_SELF_SIGNED_CERTIFICATES=true');
+}
 
 if (getenv('ACCEPT_SELF_SIGNED_CERTIFICATES') !== '') {
     // Allow self-signed certificates for local development
