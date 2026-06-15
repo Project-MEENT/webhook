@@ -418,25 +418,25 @@ class SolidClient
             && in_array('none', $supportedAuthMethods, true)
         ) {
             // Client ID Document mode: use the local config directly, no registration.
-            return $this->oidcConfig->toArray();
-        }
+            $registeredClaims = $this->oidcConfig->toArray();
+        } else {
+            // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
+            $registeredClaims = $this->getRegisteredClaims($issuer);
 
-        // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
-        $registeredClaims = $this->getRegisteredClaims($issuer);
+            if (empty($registeredClaims) || ! isset($registeredClaims['client_id'])) {
+                $registeredClaims = $this->registerClaims($issuer);
 
-        if (empty($registeredClaims) || ! isset($registeredClaims['client_id'])) {
-            $registeredClaims = $this->registerClaims($issuer);
+                if (! isset($registeredClaims['client_id'])) {
+                    throw SolidException::create(
+                        'Dynamic registration response did not include a client_id. Cannot build OIDC client for issuer.'
+                    );
+                }
 
-            if (! isset($registeredClaims['client_id'])) {
-                throw SolidException::create(
-                    'Dynamic registration response did not include a client_id. Cannot build OIDC client for issuer.'
-                );
+                $issuerMetaDataFilePath = $this->getIssuerMetaDataFilePath($issuer);
+                $fileContents = Utility::jsonEncode($registeredClaims);
+
+                $this->filesystem->write($issuerMetaDataFilePath, $fileContents);
             }
-
-            $issuerMetaDataFilePath = $this->getIssuerMetaDataFilePath($issuer);
-            $fileContents = Utility::jsonEncode($registeredClaims);
-
-            $this->filesystem->write($issuerMetaDataFilePath, $fileContents);
         }
 
         return $registeredClaims;
