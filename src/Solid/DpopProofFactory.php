@@ -60,7 +60,7 @@ class DpopProofFactory
             'jwk' => $this->privateJwk->toPublic()->all(),
         ];
 
-        $payload = json_encode($claims, JSON_THROW_ON_ERROR);
+        $payload = Utility::jsonEncode($claims);
 
         $jws = $this->jwsBuilder
             ->create()

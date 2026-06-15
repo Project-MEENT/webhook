@@ -418,8 +418,7 @@ class SolidClient
             }
 
             $issuerMetaDataFilePath = $this->getIssuerMetaDataFilePath($issuer);
-            $fileContents = json_encode($registeredClaims,
-                JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $fileContents = Utility::jsonEncode($registeredClaims);
 
             $this->filesystem->write($issuerMetaDataFilePath, $fileContents);
         }
@@ -454,7 +453,7 @@ class SolidClient
 
         if ($this->filesystem->fileExists($offlineGrantFile)) {
             $contents = $this->filesystem->read($offlineGrantFile);
-            $storedGrant = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+            $storedGrant = Utility::jsonDecode($contents);
 
             if (is_array($storedGrant)) {
                 $offlineGrant = $storedGrant;
@@ -475,7 +474,7 @@ class SolidClient
         if ($issuerMetadataFileExists) {
             // Client already registered, reading metadata from file
             $fileContents = $this->filesystem->read($issuerMetadataFile);
-            $decoded = json_decode($fileContents, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = Utility::jsonDecode($fileContents);
             // json_decode can return null for a literal JSON null value; only accept arrays.
             if (is_array($decoded)) {
                 $registeredClaims = $decoded;
@@ -537,12 +536,12 @@ class SolidClient
         $authorizationRequestParams = [];
 
         // Add Issuer URL as "state" value, so it can be retrieved after redirect
-        $header = Utility::base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'],
-            JSON_THROW_ON_ERROR));
-        $payload = Utility::base64UrlEncode(json_encode([
+        $header = Utility::base64UrlJsonEncode(['alg' => 'HS256', 'typ' => 'JWT']);
+
+        $payload = Utility::base64UrlJsonEncode([
             'exp' => time() + $this->config->expirationTime(),
             'issr' => $issuerUrl,
-        ], JSON_THROW_ON_ERROR));
+        ]);
 
         $signature = Utility::createSignature($header . '.' . $payload, $this->config->stateSigningKey());
         $state = vsprintf("%s.%s.%s", [
@@ -592,8 +591,8 @@ class SolidClient
         if (count($parts) !== 3) {
             $error = 'State must be a compact JWT';
         } else {
-            $header = json_decode(Utility::base64UrlDecode($parts[0]), true, 512, JSON_THROW_ON_ERROR);
-            $payload = json_decode(Utility::base64UrlDecode($parts[1]), true, 512, JSON_THROW_ON_ERROR);
+            $header = Utility::base64UrlJsonDecode($parts[0]);
+            $payload = Utility::base64UrlJsonDecode($parts[1]);
 
             $expectedSignature = Utility::createSignature($parts[0] . '.' . $parts[1], $this->config->stateSigningKey());
 
@@ -784,7 +783,7 @@ class SolidClient
     private function saveOfflineGrant(IssuerInterface $issuer, $webIdUrl, $grant)
     {
         $grant['saved_at'] = time();
-        $encodedGrant = json_encode($grant, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $encodedGrant = Utility::jsonEncode($grant);
 
         $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
         $this->filesystem->write($offlineGrantFile, $encodedGrant);

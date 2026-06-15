@@ -24,6 +24,16 @@ class Utility
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 
+    final public static function base64UrlJsonDecode(string $encodedData): mixed
+    {
+        return Utility::jsonDecode(Utility::base64UrlDecode($encodedData));
+    }
+
+    final public static function base64UrlJsonEncode(array $json): string
+    {
+        return Utility::base64UrlEncode(Utility::jsonEncode($json));
+    }
+
     final public static function createSignature($data, $key): string
     {
         return static::base64UrlEncode(hash_hmac(
@@ -54,5 +64,29 @@ class Utility
         }
 
         return $claims;
+    }
+
+    final public static function jsonDecode($json): mixed
+    {
+        try {
+            return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw SolidException::create('Could not decode JSON: ' . $e->getMessage(), $e);
+        }
+    }
+
+    final public static function jsonEncode($json, $pretty = false): string
+    {
+        $flags = JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES;
+
+        if ($pretty) {
+            $flags |= JSON_PRETTY_PRINT;
+        }
+
+        try {
+            return json_encode($json, $flags);
+        } catch (\JsonException $e) {
+            throw SolidException::create('Could not encode JSON: ' . $e->getMessage(), $e);
+        }
     }
 }

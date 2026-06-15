@@ -185,12 +185,12 @@ class SolidClientFactory
         // A single per-server key is valid: DPoP keys are client keys, not per-user.
         if ($filesystem->fileExists($dpopJwkFile)) {
             $json = $filesystem->read($dpopJwkFile);
-            $jwkData = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+            $jwkData = Utility::jsonDecode($json);
         }
 
         if (empty($jwkData) || ! is_array($jwkData) || ! isset($jwkData['kty'])) {
             $jwk = JWKFactory::createECKey('P-256');
-            $jwkData = json_encode($jwk->all(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $jwkData = Utility::jsonEncode($jwk->all(), true);
             $filesystem->write($dpopJwkFile, $jwkData);
         } else {
             $jwk = new JWK($jwkData);

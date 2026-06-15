@@ -6,6 +6,7 @@ use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\Solid\OidcClientConfig;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\Solid\SolidClientFactory;
+use Meent\WebHook\Solid\Utility;
 
 class WebIdInformation
 {
@@ -91,7 +92,7 @@ class WebIdInformation
                 && ! in_array(basename($path), self::IGNORE_FILES, true)
             ) {
                 $json = $this->clientFilesystem->read($path);
-                $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+                $data = Utility::jsonDecode($json);
 
                 $webIds[] = $this->normalizeUrl($data['solid_webid']);
             }
