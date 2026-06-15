@@ -434,8 +434,7 @@ class SolidClient
 
     private function getIssuerMetaDataFilePath(IssuerInterface $issuer)
     {
-        $issuerConfig = $issuer->getMetadata()->toArray();
-        $issuerUrl = $issuerConfig['issuer'];
+        $issuerUrl = $issuer->getMetadata()->getIssuer();
         $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
 
         return $issuerHash . '/' . self::ISSUER_METADATA_FILE;
@@ -443,8 +442,7 @@ class SolidClient
 
     private function getGrantFilePath(IssuerInterface $issuer, $webIdUrl)
     {
-        $issuerConfig = $issuer->getMetadata()->toArray();
-        $issuerUrl = $issuerConfig['issuer'];
+        $issuerUrl = $issuer->getMetadata()->getIssuer();
         $issuerHash = $this->hashUrl($issuerUrl, 'sha256');
         $webIdHash = $this->hashUrl($webIdUrl, 'sha1');
 
@@ -534,8 +532,7 @@ class SolidClient
         $webIdUrl,
         $session,
     ) {
-        $issuerConfig = $issuer->getMetadata()->toArray();
-        $issuerUrl = $issuerConfig['issuer'];
+        $issuerUrl = $issuer->getMetadata()->getIssuer();
 
         // At this point there is a registered oidcClient, but it is not authenticated yet.
         // Step 2. Check if user is authenticated
