@@ -31,6 +31,13 @@ $httpClientConfig = [
     ]
 ];
 
+if (getenv('ACCEPT_SELF_SIGNED_CERTIFICATES') !== '') {
+    // Allow self-signed certificates for local development
+    $httpClientConfig['verify'] = false;
+    $httpClientConfig['verify_host'] = false;
+    $httpClientConfig['verify_peer'] = false;
+}
+
 // Create FileSystems
 $dataFileSystemAdapter = new LocalFilesystemAdapter($config->get('api_storage_path'));
 $dataFilesystem = new Filesystem($dataFileSystemAdapter);
