@@ -110,11 +110,11 @@ class AdminController extends AbstractController
         $webIdsInfo = array_map(function ($info) use ($template) {
             $isAdmin = $this->adminSession->isAdmin($info['webid']);
             $isDongleRegistered = $info['api_key'];
-            $webIdHas = $this->hashUrl($info['webid'], 'sha1');
+            $webIdHash = $this->hashUrl($info['webid'], 'sha1');
 
             return vsprintf($template, [
                 '%1$s' => $info['webid'],
-                '%2$s' => $webIdHas,
+                '%2$s' => $webIdHash,
                 '%3$s' => $isAdmin ? 'checked ' : '',
                 '%4$s' => $info['has_consent'] ? 'checked ' : '',
                 '%5$s' => $isDongleRegistered ? 'checked ' : '',
