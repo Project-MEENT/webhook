@@ -405,8 +405,18 @@ class SolidClient
     private function getClaims(IssuerInterface $issuer): array
     {
         $localClientId = $this->oidcConfig->get(OidcClientConfig::CLIENT_ID);
+        $issuerMetadata = $issuer->getMetadata()->toArray();
+        // @KLUDGE: Can not use `$issuer->getMetadata()->getTokenEndpointAuthMethodsSupported();`
+        //          as the Solid Server does not return an array but a single value
+        $supportedAuthMethods = $issuerMetadata['token_endpoint_auth_methods_supported'] ?? ['client_secret_basic'];
+        if (! is_array($supportedAuthMethods)) {
+            $supportedAuthMethods = [$supportedAuthMethods];
+        }
 
-        if (is_string($localClientId) && filter_var($localClientId, FILTER_VALIDATE_URL)) {
+        if (is_string($localClientId)
+            && filter_var($localClientId, FILTER_VALIDATE_URL)
+            && in_array('none', $supportedAuthMethods, true)
+        ) {
             // Client ID Document mode: use the local config directly, no registration.
             return $this->oidcConfig->toArray();
         }
