@@ -25,7 +25,11 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 $config = Config::fromFile(__DIR__ . '/../config.php');
 
-$httpClientConfig = [];
+$httpClientConfig = [
+    'headers' => [
+        'User-Agent' => $config->get(Config::CLIENT_NAME),
+    ]
+];
 
 // Create FileSystems
 $dataFileSystemAdapter = new LocalFilesystemAdapter($config->get('api_storage_path'));
