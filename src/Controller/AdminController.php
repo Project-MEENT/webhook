@@ -389,9 +389,7 @@ HTML;
 
         $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
 
-        $response = ['headers' => ['Location' => [$redirectUri]], 'status' => 303,];
-
-        return $response;
+        return ['headers' => ['Location' => [$redirectUri]], 'status' => 303,];
     }
 
     private function hasValidCsrf(ServerRequestInterface $request): bool
