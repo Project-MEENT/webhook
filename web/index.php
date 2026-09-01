@@ -143,6 +143,18 @@ if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
 
 switch ($rootPath) {
     case OidcClientConfig::METADATA_FILE:
+        // Solid Client ID Document (Solid-OIDC §5).
+        // @TODO: This should only happen when we are in Client Metadata Document "mode"
+        //        (i.e. Static instead of Dynamic Client Registration "mode")
+        // @TODO: Support content negotiation (JSONLD) `@context https://www.w3.org/ns/solid/oidc-context.jsonld`
+        //
+        // @FIXME: This breaks, as JSON output is wrapped in an envelope.
+        //
+        // How to resolve so the Content-Type is JSON but there is no envelope?
+        //
+        // Currently resolved by setting the Content-Type header and $outputType,
+        // to avoid the envelope path AND have the correct Content-Type but this
+        // feels hacky (i.e. using unexpected side effects).
         $response = [
             'content' => $clientFilesystem->read(OidcClientConfig::METADATA_FILE),
             'headers' => ['Content-Type' => ['application/json']],
@@ -228,10 +240,11 @@ if ($output) {
 
 $content = $response['content'] ?? null;
 
-if ($outputType === 'html') {
-    if (! isset($response['headers']['Content-Type'])) {
-        $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
-    }
+if (isset($response['headers']['Content-Type'])) {
+    // As the content-type is already set, just output the provided $content.
+    // @KLUDGE: See the @FIXME at the `switch ($rootPath)` case for OidcClientConfig::METADATA_FILE (+/- line 145)
+} else if ($outputType === 'html') {
+    $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
 
     if (is_array($content) || ! empty($response['title'])) {
         if (isset($response['type']) && $response['type'] === '/errors/') {
@@ -294,7 +307,7 @@ if ($outputType === 'html') {
 JSON;
 
         $content = vsprintf($body, [
-            'type' => '/errors/',
+            // @TODO: Encode message to not break JSON
             'json-error' => $e->getMessage(),
         ]);
         $response['headers']['Content-Type'] = ['application/problem+json'];
