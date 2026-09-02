@@ -109,6 +109,7 @@ if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
     $values = [
         OidcClientConfig::CLIENT_ID => (string) $baseUrl->withPath('/' . OidcClientConfig::METADATA_FILE),
         OidcClientConfig::CLIENT_NAME => $config->get(Config::CLIENT_NAME),
+        OidcClientConfig::CLIENT_URI => (string) $baseUrl,
         OidcClientConfig::REDIRECT_URIS => [
             (string) $baseUrl->withPath('/api/consent'),
             (string) $baseUrl->withPath('/admin'),
