@@ -419,6 +419,7 @@ class SolidClient
         ) {
             // Client ID Document mode: use the local config directly, no registration.
             $registeredClaims = $this->oidcConfig->toArray();
+            $registeredClaims['token_endpoint_auth_method'] = 'none';
         } else {
             // Check if our oidcClient is already registered, if not, register it and store the metadata for future use
             $registeredClaims = $this->getRegisteredClaims($issuer);
@@ -671,7 +672,7 @@ class SolidClient
             if (str_contains($e->getMessage(), 'invalid_grant')) {
                 $message = 'Token endpoint rejected code_verifier (invalid_grant — PKCE mismatch) ' . $responseBody;
             } else {
-                $message = 'Failed to exchange authorization code for access token';
+                $message = 'Failed to exchange authorization code for access token: ' . $e->getMessage();
             }
 
             throw SolidException::create($message, $e);
