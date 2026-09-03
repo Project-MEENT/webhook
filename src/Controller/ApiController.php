@@ -111,12 +111,12 @@ class ApiController extends AbstractController
         if ($this->adminSession->isAuthenticated() !== '') {
             $response = [];
         } elseif (empty($auth)) {
-            $response = $this->errorResponse->unauthorized('API key missing','Missing API key');
+            $response = $this->errorResponse->unauthorized('API key missing', 'Missing API key');
         } elseif (! str_starts_with($auth, 'Bearer ')) {
-            $response = $this->errorResponse->badRequest('Invalid Authorization header',"Invalid Authorization header format, expected 'Bearer {api-key}'", '#invalid-auth-header',
+            $response = $this->errorResponse->badRequest('Invalid Authorization header', "Invalid Authorization header format, expected 'Bearer {api-key}'", '#invalid-auth-header',
             );
         } elseif ($this->filesystem->fileExists('keys/' . substr($auth, 7) . '.key') === false) {
-            $response = $this->errorResponse->unauthorized('Invalid API key','The provided API key is invalid');
+            $response = $this->errorResponse->unauthorized('Invalid API key', 'The provided API key is invalid');
         } else {
             $response = [];
         }
@@ -225,7 +225,7 @@ class ApiController extends AbstractController
                     ?? null;
 
                 if (isset($queryParams['error'])) {
-                    $response = $this->errorResponse->badGateway('Provider Error','The Provider returned an error: "' . urldecode($queryParams['error']) . '"');
+                    $response = $this->errorResponse->badGateway('Provider Error', 'The Provider returned an error: "' . urldecode($queryParams['error']) . '"');
                 } elseif ($isRedirect) {
                     $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
                     $webIdUrl = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
@@ -268,7 +268,7 @@ class ApiController extends AbstractController
                         'forms/form.js',
                     );
                 } elseif (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
-                    $response = $this->errorResponse->unprocessableEntity('Invalid URL',"Provided WebID '$webIdUrl' is not a valid URL");
+                    $response = $this->errorResponse->unprocessableEntity('Invalid URL', "Provided WebID '$webIdUrl' is not a valid URL");
                 } elseif ($webIdConnected || $this->solidClient->isWebIdConnected($webIdUrl)) {
                     $content = $this->createContent(
                         'Consent Provided',
@@ -281,7 +281,7 @@ class ApiController extends AbstractController
                 // Create Response
                 if (! empty($redirectUri)) {
                     $response = [
-                        'status' =>  302,
+                        'status' => 302,
                         'headers' => ['Location' => [$redirectUri]],
                     ];
 
@@ -388,7 +388,7 @@ class ApiController extends AbstractController
             $storageUrl = $this->filesystem->read($storageFilePath);
 
             if (empty($storageUrl)) {
-                return $this->errorResponse->unprocessableEntity('No Storage URL','No Storage URL found for the WebID, cannot read data from Solid Pod');
+                return $this->errorResponse->unprocessableEntity('No Storage URL', 'No Storage URL found for the WebID, cannot read data from Solid Pod');
             }
 
             $resourceUrl = vsprintf('%s/%s', [
@@ -399,7 +399,7 @@ class ApiController extends AbstractController
             try {
                 $solidResponse = $this->solidClient->fetchResource($webIdUrl, $resourceUrl);
             } catch (SolidException $e) {
-                return $this->errorResponse->badGateway('Error fetching resource from Solid Pod','Error fetching resource from Solid Pod: ' . $e->getMessage(), '#solid-fetch-error');
+                return $this->errorResponse->badGateway('Error fetching resource from Solid Pod', 'Error fetching resource from Solid Pod: ' . $e->getMessage(), '#solid-fetch-error');
             }
 
             $response = [
@@ -413,9 +413,9 @@ class ApiController extends AbstractController
 
         $isInvalidPath = ! str_contains($filePath, '/') || ! str_ends_with($filePath, '.data');
         if ($isInvalidPath) {
-            $response = $this->errorResponse->badRequest('Invalid path','Invalid path');
+            $response = $this->errorResponse->badRequest('Invalid path', 'Invalid path');
         } elseif (! $this->filesystem->fileExists($filePath)) {
-            $response = $this->errorResponse->notFound('Not found',"The requested resource '$filePath' was not found on this server.");
+            $response = $this->errorResponse->notFound('Not found', "The requested resource '$filePath' was not found on this server.");
         } else {
             $response = [
                 'content' => $this->filesystem->read($filePath),
@@ -450,7 +450,7 @@ class ApiController extends AbstractController
             // For now, we'll accept any data that is not empty.
             // Later on actual validation of the incoming data will be needed
             // (otherwise we cannot convert it to Linked Data.
-            return $this->errorResponse->unprocessableEntity('No data received','No data received');
+            return $this->errorResponse->unprocessableEntity('No data received', 'No data received');
         } else {
             // Check which Solid Pod to write to
             if (isset($apiKey)) {
@@ -483,16 +483,16 @@ class ApiController extends AbstractController
                     try {
                         $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
                     } catch (\JsonException $e) {
-                        return $this->errorResponse->unprocessableEntity('Invalid JSON','Provided data is not valid JSON: ' . $e->getMessage());
+                        return $this->errorResponse->unprocessableEntity('Invalid JSON', 'Provided data is not valid JSON: ' . $e->getMessage());
                     }
 
                     // The received JSON data MUST contain a "timestamp" value, which indicates the time the data was recorded.
                     // If we do not have a timestamp, the data can not be used in a time series, but it can also not be stored in the Pod
                     // as the timestamp is needed to build the resource path.
                     if (! isset($data['timestamp'])) {
-                        return $this->errorResponse->unprocessableEntity('Missing timestamp','Missing required "timestamp" value in the provided data');
-                    } elseif (! strtotime($data['timestamp']) && ! strtotime('@'.$data['timestamp'])) {
-                        return $this->errorResponse->unprocessableEntity('Invalid timestamp','Provided "timestamp" is not a valid timestamp.');
+                        return $this->errorResponse->unprocessableEntity('Missing timestamp', 'Missing required "timestamp" value in the provided data');
+                    } elseif (! strtotime($data['timestamp']) && ! strtotime('@' . $data['timestamp'])) {
+                        return $this->errorResponse->unprocessableEntity('Invalid timestamp', 'Provided "timestamp" is not a valid timestamp.');
                     } else {
                         $timestamp = $data['timestamp'];
                         if (is_numeric($timestamp)) {
@@ -508,7 +508,7 @@ class ApiController extends AbstractController
                         $storageUrl = $this->filesystem->read($storageFilePath);
 
                         if (empty($storageUrl)) {
-                            return $this->errorResponse->unprocessableEntity('No Storage URL','No Storage URL found for the WebID, cannot store data in Solid Pod');
+                            return $this->errorResponse->unprocessableEntity('No Storage URL', 'No Storage URL found for the WebID, cannot store data in Solid Pod');
                         }
 
                         $url = vsprintf('%s/%s/%s/%s', [
@@ -527,13 +527,13 @@ class ApiController extends AbstractController
                                 ->serialise('turtle')
                             ;
                         } catch (\Exception $e) {
-                            return $this->errorResponse->internalServerError('Data conversion error','Could not convert data to Turtle: ' . $e->getMessage());
+                            return $this->errorResponse->internalServerError('Data conversion error', 'Could not convert data to Turtle: ' . $e->getMessage());
                         }
 
                         try {
                             $result = $this->solidClient->storeResource($webIdUrl, $url, $turtle, 'text/turtle');
                         } catch (SolidException $e) {
-                            return $this->errorResponse->badGateway('Solid write error','Could not write resource to Solid Pod: ' . $e->getMessage());
+                            return $this->errorResponse->badGateway('Solid write error', 'Could not write resource to Solid Pod: ' . $e->getMessage());
                         }
 
                         if (isset($result)) {
@@ -584,15 +584,15 @@ class ApiController extends AbstractController
         $webId = trim($input);
 
         if (empty($webId)) {
-            $response = $this->errorResponse->unprocessableEntity('No data received','No data received');
+            $response = $this->errorResponse->unprocessableEntity('No data received', 'No data received');
         } elseif (filter_var($webId, FILTER_VALIDATE_URL) === false) {
-            $response = $this->errorResponse->unprocessableEntity('Invalid URL',"Provided WebID '$webId' is not a valid URL");
+            $response = $this->errorResponse->unprocessableEntity('Invalid URL', "Provided WebID '$webId' is not a valid URL");
         } else {
             $webIdHash = $this->hashUrl($webId, 'sha1');
             $exists = $this->filesystem->directoryExists($webIdHash);
 
             if ($exists) {
-                $response = $this->errorResponse->conflict('WebID already registered',"The provided WebID '$webId' has already been registered, use PUT for updates");
+                $response = $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered, use PUT for updates");
             } else {
                 $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
                 $filePath = 'keys/' . $apiKey . '.key';
@@ -676,7 +676,7 @@ class ApiController extends AbstractController
 
                 case 'PUT':
                     // @TODO: Add PUT method to update WebID (requires API key)
-                    $response = $this->errorResponse->notImplemented('Method not implemented',"Method '{$request->getMethod()}' is not implemented, MUST be" . (count($allowedMethods) > 1 ? 'one of ' : '') . implode(', ', $allowedMethods));
+                    $response = $this->errorResponse->notImplemented('Method not implemented', "Method '{$request->getMethod()}' is not implemented, MUST be" . (count($allowedMethods) > 1 ? 'one of ' : '') . implode(', ', $allowedMethods));
                 break;
             }
         } else {
