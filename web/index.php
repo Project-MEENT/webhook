@@ -11,8 +11,8 @@ use Meent\WebHook\Controller\AdminController;
 use Meent\WebHook\Controller\ApiController;
 use Meent\WebHook\Controller\DocsController;
 use Meent\WebHook\Solid\OidcClientConfig;
-use Meent\WebHook\Solid\SolidClientFactory;
 use Meent\WebHook\Solid\SolidClientConfig;
+use Meent\WebHook\Solid\SolidClientFactory;
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -176,10 +176,11 @@ switch ($rootPath) {
         $controller = new ApiController(
             $dataFilesystem,
             $solidClient,
-            $session,
-            $adminSession,
             $errorResponse
         );
+
+        $controller->setAdminSession($adminSession);
+        $controller->setSession($session);
 
         try {
             $response = $controller->handleRequest($request);

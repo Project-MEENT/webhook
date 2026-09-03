@@ -2,14 +2,14 @@
 
 namespace Meent\WebHook\Controller;
 
-use EasyRdf\Graph;
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\AdminSession;
+use Meent\WebHook\Controller\Api\ConsentController;
+use Meent\WebHook\Controller\Api\DataController;
+use Meent\WebHook\Controller\Api\RegisterController;
 use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception;
 use Meent\WebHook\Exception\RuntimeException;
-use Meent\WebHook\Exception\SolidException;
-use Meent\WebHook\Record;
 use Meent\WebHook\Session;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
@@ -38,28 +38,30 @@ class ApiController extends AbstractController
     private const SUBJECT_DATA = 'data';
     private const SUBJECT_REGISTER = 'register';
 
-    private AdminSession $adminSession;
-    private FilesystemOperator $filesystem;
-    private Session $session;
-    private SolidClient $solidClient;
+    protected AdminSession $adminSession;
+    protected Session $session;
+
+    ///////////////////////////// GETTERS & SETTERS \\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+    final public function setAdminSession(AdminSession $adminSession): void
+    {
+        $this->adminSession = $adminSession;
+    }
+
+    final public function setSession(Session $session): void
+    {
+        $this->session = $session;
+    }
 
     //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(
-        FilesystemOperator $filesystem,
-        SolidClient $solidClient,
-        Session $session,
-        AdminSession $adminSession,
-        ErrorResponse $errorResponse
-    ) {
-        $this->adminSession = $adminSession;
-        $this->errorResponse = $errorResponse;
-        $this->filesystem = $filesystem;
-        $this->session = $session;
-        $this->solidClient = $solidClient;
-    }
+        protected FilesystemOperator $filesystem,
+        protected SolidClient $solidClient,
+        protected ErrorResponse $errorResponse,
+    ) {}
 
-    final public function handleRequest(ServerRequestInterface $request): array
+    public function handleRequest(ServerRequestInterface $request): array
     {
         try {
             $subject = $this->getRequestedSubject($request);
@@ -71,17 +73,19 @@ class ApiController extends AbstractController
         switch ($subject) {
             case self::SUBJECT_CONSENT:
                 if ($version >= 0.4) {
-                    $response = $this->handleConsentRequest($request);
+                    $controller = new ConsentController($this->filesystem, $this->solidClient, $this->errorResponse);
+                    $controller->setSession($this->session);
                 } else {
                     $response = $this->handleNotFound($request);
                 }
             break;
             case self::SUBJECT_DATA:
-                $response = $this->handleDataRequest($request);
+                $controller = new DataController($this->filesystem, $this->solidClient, $this->errorResponse);
+                $controller->setAdminSession($this->adminSession);
             break;
 
             case self::SUBJECT_REGISTER:
-                $response = $this->handleRegisterRequest($request);
+                $controller = new RegisterController($this->filesystem, $this->solidClient, $this->errorResponse);
             break;
 
             case self::SUBJECT_ROOT:
@@ -91,6 +95,10 @@ class ApiController extends AbstractController
             default:
                 $response = $this->handleNotFound($request);
             break;
+        }
+
+        if (isset($controller)) {
+            $response = $controller->handleRequest($request);
         }
 
         $response['headers']['API-Version'] = ["v$version"];
@@ -104,27 +112,7 @@ class ApiController extends AbstractController
 
     ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-    private function checkAuthorization(ServerRequestInterface $request)
-    {
-        $auth = $request->getHeaderLine('Authorization');
-
-        if ($this->adminSession->isAuthenticated() !== '') {
-            $response = [];
-        } elseif (empty($auth)) {
-            $response = $this->errorResponse->unauthorized('API key missing', 'Missing API key');
-        } elseif (! str_starts_with($auth, 'Bearer ')) {
-            $response = $this->errorResponse->badRequest('Invalid Authorization header', "Invalid Authorization header format, expected 'Bearer {api-key}'", '#invalid-auth-header',
-            );
-        } elseif ($this->filesystem->fileExists('keys/' . substr($auth, 7) . '.key') === false) {
-            $response = $this->errorResponse->unauthorized('Invalid API key', 'The provided API key is invalid');
-        } else {
-            $response = [];
-        }
-
-        return $response;
-    }
-
-    private function getBaseUrl(ServerRequestInterface $request)
+    final protected function getBaseUrl(ServerRequestInterface $request): string
     {
         return $request->getUri()->getScheme() . '://'
             . $request->getUri()->getHost()
@@ -140,7 +128,7 @@ class ApiController extends AbstractController
         return end($versions);
     }
 
-    private function getRequestedObject(ServerRequestInterface $request)
+    final protected function getRequestedObject(ServerRequestInterface $request): string
     {
         $subject = $this->getRequestedSubject($request);
         $path = $request->getUri()->getPath();
@@ -151,7 +139,7 @@ class ApiController extends AbstractController
         return ltrim($object, '/');
     }
 
-    private function getRequestedSubject(ServerRequestInterface $request)
+    final protected function getRequestedSubject(ServerRequestInterface $request)
     {
         $parts = $this->splitUriPath($request);
 
@@ -174,7 +162,7 @@ class ApiController extends AbstractController
         return $subject;
     }
 
-    private function getRequestedVersion(ServerRequestInterface $request)
+    final protected function getRequestedVersion(ServerRequestInterface $request): float
     {
         $parts = $this->splitUriPath($request);
 
@@ -200,490 +188,6 @@ class ApiController extends AbstractController
         }
 
         return (float) ltrim($version, 'v');
-    }
-
-    private function handleConsentRequest(ServerRequestInterface $request)
-    {
-        $requestMethod = $request->getMethod();
-        $queryParams = $request->getQueryParams();
-        $allowedMethods = ['GET', 'POST'];
-
-        switch ($requestMethod) {
-            case 'GET':
-            case 'POST':
-                // @FIXME: Try/Catch + Error handling
-
-                $redirectUri = '';
-
-                // Detect whether this request is the callback from the authorization server.
-                // When the OP redirects back it always includes `code` (success) or `error` (failure).
-                $isRedirect = isset($queryParams['code']);
-                $webIdConnected = isset($queryParams['connected']);
-                $webIdUrl = $request->getParsedBody()['webid']
-                    ?? $queryParams['webid']
-                    ?? $queryParams['connected']
-                    ?? null;
-
-                if (isset($queryParams['error'])) {
-                    $response = $this->errorResponse->badGateway('Provider Error', 'The Provider returned an error: "' . urldecode($queryParams['error']) . '"');
-                } elseif ($isRedirect) {
-                    $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
-                    $webIdUrl = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
-
-                    $storageUrls = $this->solidClient->fetchStorageUrls($webIdUrl);
-
-                    if ($storageUrls === []) {
-                        return $this->errorResponse->unprocessableEntity('No Storage URL',
-                            'No Storage URL found for the WebID, cannot write data to Solid Pod');
-                    // } else if (count($storageUrls) > 1) {
-                    // @FIXME: Instead of using the first URL, the user should be asked which one to use
-                    } else {
-                        $storageUrl = reset($storageUrls);
-                    }
-
-                    $containerUrl = vsprintf('%s/%s/', [
-                        'root' => rtrim($storageUrl, '/'),
-                        'path' => 'MEENT/p1',
-                    ]);
-
-                    $solidResponse = $this->solidClient->storeResource(
-                        $webIdUrl,
-                        rtrim($containerUrl, '/') . '/README.md',
-                        'This Container is where all P1 dongle data is written.'
-                    );
-
-                    $storageFilePath = vsprintf('/storage-urls/%s.url', [
-                        'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
-                    ]);
-                    $this->filesystem->write($storageFilePath, $storageUrl);
-
-                    $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
-                } elseif (! $webIdUrl) {
-                    $form = file_get_contents(__DIR__ . '/../content/forms/consent.html');
-
-                    $content = $this->createContent(
-                        'Provide consent',
-                        '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
-                        "<section>$form</section><section><output></output></section>",
-                        'forms/form.js',
-                    );
-                } elseif (! filter_var($webIdUrl, FILTER_VALIDATE_URL)) {
-                    $response = $this->errorResponse->unprocessableEntity('Invalid URL', "Provided WebID '$webIdUrl' is not a valid URL");
-                } elseif ($webIdConnected || $this->solidClient->isWebIdConnected($webIdUrl)) {
-                    $content = $this->createContent(
-                        'Consent Provided',
-                        "<p>Your P1 dongle can now be connected to your Solid Pod, using WebID <a href='$webIdUrl'>$webIdUrl</a></p>",
-                    );
-                } else {
-                    $redirectUri = $this->solidClient->connectWebId($webIdUrl, $this->session);
-                }
-
-                // Create Response
-                if (! empty($redirectUri)) {
-                    $response = [
-                        'status' => 302,
-                        'headers' => ['Location' => [$redirectUri]],
-                    ];
-
-                } elseif (isset($content)) {
-                    $response = ['content' => $content, 'status' => 200];
-                }
-            break;
-
-            case 'HEAD':
-            case 'OPTIONS':
-                $response = $this->handleAllowedHttpMethods($allowedMethods);
-            break;
-
-            case 'DELETE':
-            case 'PATCH':
-            case 'PUT':
-                $response = $this->handleMethodNotAllowed($request, $allowedMethods);
-            break;
-        }
-
-        return $response;
-    }
-
-    private function handleDataRequest(ServerRequestInterface $request)
-    {
-        $requestMethod = $request->getMethod();
-        $version = $this->getRequestedVersion($request);
-
-        $allowedMethods = ['POST'];
-        if ($version >= 0.2) {
-            $allowedMethods[] = 'GET';
-        }
-
-        switch ($requestMethod) {
-            case 'GET':
-                if ($version >= 0.2) {
-                    $response = $this->handleDataGet($request);
-                    break;
-                }
-            case 'PATCH':
-            case 'PUT':
-                $response = $this->handleMethodNotAllowed($request, $allowedMethods);
-            break;
-
-            case 'HEAD':
-            case 'OPTIONS':
-                $allowedMethods = array_merge($allowedMethods, ['HEAD', 'OPTIONS']);
-                $response = $this->handleAllowedHttpMethods($allowedMethods);
-            break;
-
-            case 'POST':
-                $input = file_get_contents('php://input');
-                $response = $this->handleDataPost($request, $input);
-            break;
-        }
-
-        return $response;
-    }
-
-    private function handleDataGet(ServerRequestInterface $request)
-    {
-        $version = $this->getRequestedVersion($request);
-        $queryParams = $request->getQueryParams();
-
-        if ($version >= 0.4 && ! $request->getHeaderLine('Authorization') && ! isset($queryParams['webid'])) {
-            $form = file_get_contents(__DIR__ . '/../content/forms/data.html');
-
-            $content = $this->createContent(
-                'Post content',
-                '<p>To write data to a Solid Pod, please provide authentication and data</p>',
-                "<section>$form</section><section><output></output></section>",
-                'forms/form.js',
-            );
-
-            $response = ['content' => $content, 'status' => 200];
-
-            return $response;
-        }
-
-        if ($version >= 0.3) {
-            $authError = $this->checkAuthorization($request);
-
-            if ($authError !== []) {
-                return $authError;
-            } elseif ($version >= 0.4) {
-                $auth = $request->getHeaderLine('Authorization');
-                $apiKey = substr($auth, 7);
-            }
-        }
-
-        $filePath = $this->getRequestedObject($request);
-        if (! empty($apiKey)) {
-            $webIdUrl = $this->filesystem->read('keys/' . $apiKey . '.key');
-        } elseif (isset($queryParams['webid'])) {
-            $webIdUrl = $queryParams['webid'];
-        } else {
-            $webIdUrl = null;
-        }
-
-        if ($webIdUrl) {
-            $storageFilePath = vsprintf('/storage-urls/%s.url', [
-                'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
-            ]);
-            $storageUrl = $this->filesystem->read($storageFilePath);
-
-            if (empty($storageUrl)) {
-                return $this->errorResponse->unprocessableEntity('No Storage URL', 'No Storage URL found for the WebID, cannot read data from Solid Pod');
-            }
-
-            $resourceUrl = vsprintf('%s/%s', [
-                'root' => $storageUrl,
-                'path' => $filePath,
-            ]);
-
-            try {
-                $solidResponse = $this->solidClient->fetchResource($webIdUrl, $resourceUrl);
-            } catch (SolidException $e) {
-                return $this->errorResponse->badGateway('Error fetching resource from Solid Pod', 'Error fetching resource from Solid Pod: ' . $e->getMessage(), '#solid-fetch-error');
-            }
-
-            $response = [
-                'content' => $solidResponse->getBody()->getContents(),
-                'status' => 200,
-                'headers' => ['Content-Type' => [$solidResponse->getHeaderLine('Content-Type')]],
-            ];
-
-            return $response;
-        }
-
-        $isInvalidPath = ! str_contains($filePath, '/') || ! str_ends_with($filePath, '.data');
-        if ($isInvalidPath) {
-            $response = $this->errorResponse->badRequest('Invalid path', 'Invalid path');
-        } elseif (! $this->filesystem->fileExists($filePath)) {
-            $response = $this->errorResponse->notFound('Not found', "The requested resource '$filePath' was not found on this server.");
-        } else {
-            $response = [
-                'content' => $this->filesystem->read($filePath),
-                'status' => 200,
-                'title' => 'File Contents',
-            ];
-        }
-
-        return $response;
-    }
-
-    private function handleDataPost(ServerRequestInterface $request, $input)
-    {
-        $version = $this->getRequestedVersion($request);
-
-        if ($version >= 0.3) {
-            // When a request is received, it MUST have an "Authorization" header with a "Bearer" scheme:
-            //      Authorization: Bearer {api-key}
-            $authError = $this->checkAuthorization($request);
-
-            if ($authError !== []) {
-                return $authError;
-            } else {
-                $auth = $request->getHeaderLine('Authorization');
-                $apiKey = substr($auth, 7);
-            }
-        }
-
-        // @TODO: Convert to Linked-Data once ontology is decided upon
-        if (empty($input)) {
-            // @TODO: Validate that the incoming data format and content is correct.
-            // For now, we'll accept any data that is not empty.
-            // Later on actual validation of the incoming data will be needed
-            // (otherwise we cannot convert it to Linked Data.
-            return $this->errorResponse->unprocessableEntity('No data received', 'No data received');
-        } else {
-            // Check which Solid Pod to write to
-            if (isset($apiKey)) {
-                $webIdUrl = $this->filesystem->read('keys/' . $apiKey . '.key');
-            }
-
-            $message = 'Records written';
-
-            if ($version >= 0.2) {
-                $dateTime = new \DateTimeImmutable('now');
-                $dateTime->setTimezone(new \DateTimeZone('Europe/Amsterdam'));
-                $timestamp = $dateTime->format('Ymd.His');
-
-                $id = rtrim(strtr(base64_encode(random_bytes(12)), '+/', '-_'), '=');
-                if ($version >= 0.3) {
-                    // When data is received, it is stored in `/{webid-hash}/{timestamp}.{id}.data`
-                    $filePath = vsprintf("%s/%s.%s.data", [
-                        'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
-                        'timestamp' => $timestamp,
-                        $id,
-                    ]);
-                } else {
-                    $filePath = "$timestamp.$id.data";
-                }
-
-                // Received data is written locally as-is
-                $this->filesystem->write($filePath, $input);
-
-                if ($version >= 0.4) {
-                    try {
-                        $data = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
-                    } catch (\JsonException $e) {
-                        return $this->errorResponse->unprocessableEntity('Invalid JSON', 'Provided data is not valid JSON: ' . $e->getMessage());
-                    }
-
-                    // The received JSON data MUST contain a "timestamp" value, which indicates the time the data was recorded.
-                    // If we do not have a timestamp, the data can not be used in a time series, but it can also not be stored in the Pod
-                    // as the timestamp is needed to build the resource path.
-                    if (! isset($data['timestamp'])) {
-                        return $this->errorResponse->unprocessableEntity('Missing timestamp', 'Missing required "timestamp" value in the provided data');
-                    } elseif (! strtotime($data['timestamp']) && ! strtotime('@' . $data['timestamp'])) {
-                        return $this->errorResponse->unprocessableEntity('Invalid timestamp', 'Provided "timestamp" is not a valid timestamp.');
-                    } else {
-                        $timestamp = $data['timestamp'];
-                        if (is_numeric($timestamp)) {
-                            $timestamp = '@' . $timestamp;
-                        }
-                        $dateTime = new \DateTimeImmutable($timestamp);
-                        $dateTime->setTimezone(new \DateTimeZone('Europe/Amsterdam'));
-                        $timestamp = $dateTime->format('Ymd.His');
-
-                        $storageFilePath = vsprintf('/storage-urls/%s.url', [
-                            'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
-                        ]);
-                        $storageUrl = $this->filesystem->read($storageFilePath);
-
-                        if (empty($storageUrl)) {
-                            return $this->errorResponse->unprocessableEntity('No Storage URL', 'No Storage URL found for the WebID, cannot store data in Solid Pod');
-                        }
-
-                        $url = vsprintf('%s/%s/%s/%s', [
-                            'root' => $storageUrl,
-                            'path' => 'MEENT/p1',
-                            'container' => $dateTime->format('Ymd'),
-                            'resource' => $timestamp . '.ttl',
-                        ]);
-
-                        try {
-                            $graph = new Graph($url);
-                            $record = new Record($graph);
-
-                            $turtle = $record
-                                ->populate((array) $data)
-                                ->serialise('turtle')
-                            ;
-                        } catch (\Exception $e) {
-                            return $this->errorResponse->internalServerError('Data conversion error', 'Could not convert data to Turtle: ' . $e->getMessage());
-                        }
-
-                        try {
-                            $result = $this->solidClient->storeResource($webIdUrl, $url, $turtle, 'text/turtle');
-                        } catch (SolidException $e) {
-                            return $this->errorResponse->badGateway('Solid write error', 'Could not write resource to Solid Pod: ' . $e->getMessage());
-                        }
-
-                        if (isset($result)) {
-                            // Remove local copy, as the raw data has been saved in the Pod
-                            try {
-                                $this->filesystem->delete($filePath);
-                            } catch (\Exception $e) {
-                                // We do not care if the delete fails, as the "retry" logic can handle this later
-                                // The retry logic should first check if the file hasn't already been written to the remote.
-                            }
-
-                            // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
-                            $redirectUri = $url;
-                        }
-                    }
-                } elseif ($version >= 0.3) {
-                    // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
-                    $redirectUri = $this->getBaseUrl($request) . '/api/data/' . $filePath;
-                } else {
-                    $data = $input;
-                    $message .= ' to ' . $filePath;
-                    $statuscode = 201;
-                }
-            } else {
-                $data = $input;
-                $statuscode = 201;
-            }
-
-            // Return success
-            /* @TODO: Add link to URL on Solid Pod . '' */
-
-            if (isset($redirectUri)) {
-                // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2);
-                $response = ['content' => null, 'headers' => ['Location' => [$redirectUri]], 'status' => 201, 'title' => $message];
-            } else {
-                $response = ['content' => $data, 'status' => $statuscode, 'title' => $message];
-            }
-        }
-
-        return $response;
-    }
-
-    private function handleRegisterPost(ServerRequestInterface $request)
-    {
-        $input = $request->getBody()->getContents();
-        $version = $this->getRequestedVersion($request);
-
-        $webId = trim($input);
-
-        if (empty($webId)) {
-            $response = $this->errorResponse->unprocessableEntity('No data received', 'No data received');
-        } elseif (filter_var($webId, FILTER_VALIDATE_URL) === false) {
-            $response = $this->errorResponse->unprocessableEntity('Invalid URL', "Provided WebID '$webId' is not a valid URL");
-        } else {
-            $webIdHash = $this->hashUrl($webId, 'sha1');
-            $exists = $this->filesystem->directoryExists($webIdHash);
-
-            if ($exists) {
-                $response = $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered, use PUT for updates");
-            } else {
-                $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
-                $filePath = 'keys/' . $apiKey . '.key';
-
-                $isConnected = true;
-                if ($version >= 0.4) {
-                    $isConnected = $this->solidClient->isWebIdConnected($webId);
-
-                    if (! $isConnected) {
-                        $connectionUrl = $request->getUri()->withPath('/api/consent')->withQuery('webid=' . urlencode($webId));
-                        $response = $this->errorResponse->proxyAuthenticationRequired('WebID Authentication Required', "The provided WebID '$webId' is not yet connected. To connect this WebID, visit: $connectionUrl", '#webid-not-connected');
-                        // @CHECKME: Add Location header?
-                        // $response['headers']['Location'] = [$connectionUrl];
-                    }
-                }
-
-                if ($isConnected === true) {
-                    $this->filesystem->write($filePath, $webId);
-                    $this->filesystem->createDirectory($webIdHash);
-
-                    $response = [
-                        'content' => ['api_key' => $apiKey, 'webid' => $webId],
-                        'status' => 201,
-                        'title' => 'WebID registered',
-                    ];
-                }
-            }
-        }
-
-        return $response;
-    }
-
-    private function handleRegisterRequest(ServerRequestInterface $request)
-    {
-        $requestMethod = $request->getMethod();
-        $queryParams = $request->getQueryParams();
-
-        $version = $this->getRequestedVersion($request);
-
-        if ($version > 0.2) {
-            $allowedMethods = ['POST'];
-            if ($version >= 0.4) {
-                $allowedMethods[] = 'GET';
-            }
-
-            switch ($requestMethod) {
-                case 'GET':
-                    if ($version >= 0.4) {
-                        $webIdUrl = $queryParams['webid'] ?? '';
-
-                        $replace = [
-                            '{webid}' => $webIdUrl,
-                        ];
-                        $formContents = file_get_contents(__DIR__ . '/../content/forms/register.html');
-                        $form = str_replace(array_keys($replace), $replace, $formContents);
-
-                        $content = $this->createContent(
-                            'Provide consent',
-                            '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
-                            "<section>$form</section><section><output></output></section>",
-                            'forms/form.js',
-                        );
-
-                        $response = ['content' => $content, 'status' => 200];
-                    } else {
-                        $response = $this->handleMethodNotAllowed($request, $allowedMethods);
-                    }
-                break;
-                case 'PATCH':
-                    $response = $this->handleMethodNotAllowed($request, $allowedMethods);
-                break;
-
-                case 'HEAD':
-                case 'OPTIONS':
-                    $response = $this->handleAllowedHttpMethods($allowedMethods);
-                break;
-
-                case 'POST':
-                    $response = $this->handleRegisterPost($request);
-                break;
-
-                case 'PUT':
-                    // @TODO: Add PUT method to update WebID (requires API key)
-                    $response = $this->errorResponse->notImplemented('Method not implemented', "Method '{$request->getMethod()}' is not implemented, MUST be" . (count($allowedMethods) > 1 ? 'one of ' : '') . implode(', ', $allowedMethods));
-                break;
-            }
-        } else {
-            $response = $this->handleNotFound($request);
-        }
-
-        return $response;
     }
 
     private function handleRootRequest(ServerRequestInterface $request)
