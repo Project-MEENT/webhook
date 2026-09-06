@@ -40,7 +40,7 @@ class OidcClientConfig extends AbstractConfig
         return [
             self::INITIAL_ACCESS_TOKEN => 'Initial Access Token for dynamic client registration (optional, only needed if the OP requires it)',
 
-            self::GRANT_TYPES => 'Array of OAuth 2.0 grant type strings that the client intends to use.',
+            self::GRANT_TYPES => 'Space-delimited list of OAuth 2.0 grant type strings that the client intends to use.',
             // By default, this is "authorization_code" (see RFC-7591 OAuth 2.0, Section 4.1.)
             // OpenID Connect Core 1.0 Section 5.4. Requesting Claims using Scope Values
             self::SCOPE => 'List of Scope (see RFC6749 OAuth 2.0 Section 3.3) that specify which access is requested for Access Tokens.',

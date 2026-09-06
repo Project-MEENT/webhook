@@ -36,7 +36,7 @@ abstract class AbstractController
                 $scripts = [$scripts];
             }
 
-            array_walk($scripts, function ($script) use (&$context) {
+            array_walk($scripts, static function ($script) use (&$context) {
                 $path = __DIR__ . '/../content/' . $script;
 
                 if (! file_exists($path)) {

@@ -79,6 +79,7 @@ class ApiController extends AbstractController
                     $response = $this->handleNotFound($request);
                 }
             break;
+
             case self::SUBJECT_DATA:
                 $controller = new DataController($this->filesystem, $this->solidClient, $this->errorResponse);
                 $controller->setAdminSession($this->adminSession);

@@ -62,9 +62,9 @@ class AdminSession
         );
     }
 
-    final public function isAuthenticated(): ?string
+    final public function isAuthenticated(): string
     {
-        $adminWebId = null;
+        $adminWebId = '';
 
         $authenticatedAt = $this->session->get(self::SESSION_KEY_AUTHENTICATED_AT);
         $sessionWebId = $this->session->get(self::SESSION_KEY_AUTHENTICATED_WEBID);

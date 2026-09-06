@@ -87,7 +87,7 @@ class RegisterController extends ApiController
             $exists = $this->filesystem->directoryExists($webIdHash);
 
             if ($exists) {
-                $response = $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered, use PUT for updates");
+                $response = $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered"); // @TODO: use PUT for updates
             } else {
                 $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
                 $filePath = 'keys/' . $apiKey . '.key';

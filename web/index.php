@@ -186,7 +186,7 @@ switch ($rootPath) {
             $response = $controller->handleRequest($request);
         } catch (FilesystemException $exception) {
             $response = $errorResponse->internalServerError('Write Failed', 'Failed to write data: ' . $exception->getMessage());
-        } catch (\Exception $exception) {
+        } catch (\Throwable $exception) {
             $response = $errorResponse->internalServerError('Unexpected Error', 'An unexpected error occurred: ' . $exception->getMessage());
         }
     break;

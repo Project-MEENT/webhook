@@ -142,7 +142,6 @@ class SolidClient
                 }
             } catch (SolidException $e) {
                 // If offline refresh fails, continue with interactive authorization flow.
-                $offlineModeHandled = false;
             }
         }
 
@@ -383,7 +382,7 @@ class SolidClient
     {
         $registeredClaims = $this->getClaims($issuer);
 
-        // @KLUDGE: The OIDC Client library send the first redirect_uri, ignoring
+        // @KLUDGE: The OIDC Client library sends the first redirect_uri, ignoring
         //          regardless of which redirect_uri has been set in the grant.
         //          So we need to make sure the desired URL is the first in the array.
         $redirectUri = $this->config->get(SolidClientConfig::REDIRECT_URI);

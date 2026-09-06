@@ -28,7 +28,7 @@ class DataController extends ApiController
                     $response = $this->handleGetRequest($request);
                     break;
                 }
-                // nobreak
+            // nobreak
             case 'PATCH':
             case 'PUT':
                 $response = $this->handleMethodNotAllowed($request, $allowedMethods);
@@ -54,16 +54,17 @@ class DataController extends ApiController
     private function checkAuthorization(ServerRequestInterface $request): array
     {
         $auth = $request->getHeaderLine('Authorization');
+        $apiKey = substr($auth, 7); // 7 chars = `Bearer `
 
-        if (!isset($this->adminSession)) {
+        if (! isset($this->adminSession)) {
             throw new \RuntimeException('Cannot handle request before AdminSession is set');
         } elseif ($this->adminSession->isAuthenticated() === '') {
-            $response = $this->errorResponse->unauthorized('Not authenticated', 'No active session found, please login first');
+            $response = $this->errorResponse->unauthorized('Not authenticated', 'No active session found, please log in first');
         } elseif (empty($auth)) {
             $response = $this->errorResponse->unauthorized('Missing Authorization header', 'Authorization header is missing (or empty)');
         } elseif (! str_starts_with($auth, 'Bearer ')) {
             $response = $this->errorResponse->badRequest('Invalid Authorization header', 'Invalid Authorization header format, expected "Bearer {api-key}"', '#invalid-auth-header');
-        } elseif ($this->filesystem->fileExists('keys/' . substr($auth, 7) . '.key') === false) {
+        } elseif (! $apiKey || $this->filesystem->fileExists('keys/' . $apiKey . '.key') === false) {
             $response = $this->errorResponse->unauthorized('Invalid API key', 'The provided API key is invalid');
         } else {
             $response = [];
@@ -97,7 +98,7 @@ class DataController extends ApiController
                 return $authError;
             } elseif ($version >= 0.4) {
                 $auth = $request->getHeaderLine('Authorization');
-                $apiKey = substr($auth, 7);
+                $apiKey = substr($auth, 7); // 7 chars = `Bearer `
             }
         }
 
@@ -169,7 +170,7 @@ class DataController extends ApiController
                 return $authError;
             } else {
                 $auth = $request->getHeaderLine('Authorization');
-                $apiKey = substr($auth, 7);
+                $apiKey = substr($auth, 7); // 7 chars = `Bearer `
             }
         }
 
@@ -257,7 +258,7 @@ class DataController extends ApiController
                                 ->populate((array) $data)
                                 ->serialise('turtle')
                             ;
-                        } catch (\Exception $e) {
+                        } catch (\Throwable $e) {
                             return $this->errorResponse->internalServerError('Data conversion error', 'Could not convert data to Turtle: ' . $e->getMessage());
                         }
 
@@ -270,7 +271,7 @@ class DataController extends ApiController
                         // Remove local copy, as the raw data has been saved in the Pod
                         try {
                             $this->filesystem->delete($filePath);
-                        } catch (\Exception $e) {
+                        } catch (\Throwable $e) {
                             // We do not care if the delete fails, as the "retry" logic can handle this later
                             // The retry logic should first check if the file hasn't already been written to the remote.
                         }

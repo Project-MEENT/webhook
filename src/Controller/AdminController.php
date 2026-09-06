@@ -98,14 +98,14 @@ class AdminController extends AbstractController
         $template = $this->getContents('webid-table-row');
 
         $webIdsInfo = array_map(function ($info) use ($template) {
-            $webid = $info['webid'] ?? '';
+            $webId = $info['webid'] ?? '';
 
-            $isAdmin = $this->adminSession->isAdmin($webid);
+            $isAdmin = $this->adminSession->isAdmin($webId);
             $isDongleRegistered = ! empty($info['api_key']);
-            $webIdHash = $this->hashUrl($webid, 'sha1');
+            $webIdHash = $this->hashUrl($webId, 'sha1');
 
             return vsprintf($template, [
-                '%1$s' => $webid,
+                '%1$s' => $webId,
                 '%2$s' => $webIdHash,
                 '%3$s' => $isAdmin ? 'checked ' : '',
                 '%4$s' => $info['has_consent'] ? 'checked ' : '',
@@ -309,23 +309,23 @@ HTML;
             case 'GET':
                 $adminWebId = $this->adminSession->isAuthenticated();
 
-                if ($adminWebId) {
+                if ($adminWebId !== '') {
                     $logoutForm = $this->getContents('forms/admin-logout');
                     $logoutForm = $this->addCsrfToForm($logoutForm);
                     $logoutForm = str_replace(['{webid}'], [$adminWebId], $logoutForm);
 
                     $webIds = $this->webIdInformation->getAll();
                     if ($webIds === []) {
-                        $WebIdsHtml = '<p><em>No WebIDs found.</em></p>';
+                        $webIdsHtml = '<p><em>No WebIDs found.</em></p>';
                     } else {
-                        $WebIdsHtml = $this->createInfoTable($webIds);
+                        $webIdsHtml = $this->createInfoTable($webIds);
                     }
-                    $WebIdsHtml = $this->addCsrfToForm($WebIdsHtml);
+                    $webIdsHtml = $this->addCsrfToForm($webIdsHtml);
 
                     $content = $this->createContent(
                         'Admin dashboard',
                         $logoutForm,
-                        "<section>$WebIdsHtml</section>",
+                        "<section>$webIdsHtml</section>",
                         [
                             'forms/admin.js',
                             'forms/check-solid-connection.js',
@@ -366,16 +366,16 @@ HTML;
     private function handleUpdateAdminsRequest(ServerRequestInterface $request): array
     {
         $body = $request->getParsedBody();
-        $webid = $this->normalizeUrl($body['webid']);
+        $webId = $this->normalizeUrl($body['webid']);
         $makeAdmin = isset($body['makeAdmin']) && $body['makeAdmin'] === 'on';
 
         $webIds = $this->config->get(Config::ADMIN_WEBIDS);
         $config = $this->config->toArray();
 
-        if ($makeAdmin && ! in_array($webid, $webIds, true)) {
-            $webIds[] = $webid;
-        } elseif (! $makeAdmin && in_array($webid, $webIds, true)) {
-            $webIds = array_diff($webIds, [$webid]);
+        if ($makeAdmin && ! in_array($webId, $webIds, true)) {
+            $webIds[] = $webId;
+        } elseif (! $makeAdmin && in_array($webId, $webIds, true)) {
+            $webIds = array_diff($webIds, [$webId]);
 
             if ($webIds === []) {
                 throw InvalidArgumentException::create('Cannot remove WebID as there would be no admin left');
