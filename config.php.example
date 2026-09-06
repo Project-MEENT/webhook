@@ -2,12 +2,14 @@
 
 return [
     'admin_webids' => [
-        'https://id-0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d.solid-01.muze.nl/#me',
+        'https://id-0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d.solid.localhost/#me',
     ],
-    'api_storage_path' => __DIR__ . '/build/data',
+    'api_storage_path' => __DIR__ . '/build/api',
     'client_name' => 'MEENT Solid P1 Dongle Webhook',
     'jwt_ttl' => 300, // 5 minutes in seconds
     'metadata_cache_ttl' => 2592000, // 30 days in seconds
-    'solid_storage_path' => __DIR__ . '/build/storage',
+    'pod_creation_key' => '0a1b2c3d4e5f6g7h8i9j0k',
+    'pod_creation_url' => 'https://solid.localhost/api/accounts/create',
+    'solid_storage_path' => __DIR__ . '/build/solid-client',
     'state_signing_key' => 'abcdefghijklmnopqrstuvwxyz01234567890ABCDEF',
 ];

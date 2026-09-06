@@ -2,6 +2,7 @@
 
 namespace Meent\WebHook;
 
+use GuzzleHttp\Client as HttpClient;
 use GuzzleHttp\HandlerStack;
 use Laminas\Diactoros\ServerRequestFactory;
 use League\Flysystem\Filesystem;
@@ -181,6 +182,16 @@ switch ($rootPath) {
 
         $controller->setAdminSession($adminSession);
         $controller->setSession($session);
+
+        $podCreationUrl = $config->get(Config::POD_CREATION_URL);
+        if ($podCreationUrl) {
+            $httpClientConfig['base_uri'] = $podCreationUrl;
+            $httpClientConfig['headers']['Authorization'] = 'Bearer ' . $config->get(Config::POD_CREATION_KEY);
+            $httpClientConfig['headers']['Origin'] = (string) $baseUrl;
+
+            $httpClient = new HttpClient($httpClientConfig);
+            $controller->setHttpClient($httpClient);
+        }
 
         try {
             $response = $controller->handleRequest($request);

@@ -6,6 +6,7 @@ use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\AdminSession;
 use Meent\WebHook\Controller\Api\ConsentController;
 use Meent\WebHook\Controller\Api\DataController;
+use Meent\WebHook\Controller\Api\PodCreationController;
 use Meent\WebHook\Controller\Api\RegisterController;
 use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception;
@@ -13,6 +14,7 @@ use Meent\WebHook\Exception\RuntimeException;
 use Meent\WebHook\Session;
 use Meent\WebHook\Solid\SolidClient;
 use Meent\WebHook\UrlHashTrait;
+use Psr\Http\Client\ClientInterface as HttpClientInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 class ApiController extends AbstractController
@@ -24,6 +26,7 @@ class ApiController extends AbstractController
     private const AVAILABLE_SUBJECTS = [
         self::SUBJECT_CONSENT,
         self::SUBJECT_DATA,
+        self::SUBJECT_POD_CREATION,
         self::SUBJECT_REGISTER,
     ];
 
@@ -32,13 +35,16 @@ class ApiController extends AbstractController
         'v0.2', // Store without API key
         'v0.3', // Store with registered API key
         'v0.4', // Provide consent
+        'v0.5', // Solid Pod Creation
     ];
 
     private const SUBJECT_CONSENT = 'consent';
     private const SUBJECT_DATA = 'data';
+    private const SUBJECT_POD_CREATION = 'pod';
     private const SUBJECT_REGISTER = 'register';
 
     protected AdminSession $adminSession;
+    protected HttpClientInterface $httpClient;
     protected Session $session;
 
     ///////////////////////////// GETTERS & SETTERS \\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -46,6 +52,11 @@ class ApiController extends AbstractController
     final public function setAdminSession(AdminSession $adminSession): void
     {
         $this->adminSession = $adminSession;
+    }
+
+    final public function setHttpClient(HttpClientInterface $httpClient): void
+    {
+        $this->httpClient = $httpClient;
     }
 
     final public function setSession(Session $session): void
@@ -83,6 +94,15 @@ class ApiController extends AbstractController
             case self::SUBJECT_DATA:
                 $controller = new DataController($this->filesystem, $this->solidClient, $this->errorResponse);
                 $controller->setAdminSession($this->adminSession);
+            break;
+
+            case self::SUBJECT_POD_CREATION:
+                if ($version >= 0.5) {
+                    $controller = new PodCreationController($this->filesystem, $this->solidClient, $this->errorResponse);
+                    $controller->setHttpClient($this->httpClient);
+                } else {
+                    $response = $this->handleNotFound($request);
+                }
             break;
 
             case self::SUBJECT_REGISTER:

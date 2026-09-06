@@ -21,6 +21,11 @@ document.querySelectorAll('form:not([data-js="consent-form"])').forEach(form => 
             selectors = 'input[name="webid"]'
         }
 
+        if (form.dataset.js === 'pod-creation-form'){
+            contentType = 'text/plain'
+            selectors = 'input[name="mac"]'
+        }
+
         const input = form.querySelector(selectors)
         const data = input?.value?.trim() || ''
 

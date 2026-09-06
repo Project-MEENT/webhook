@@ -1,0 +1,19 @@
+<form action="/api/pod/" data-js="pod-creation-form" method="POST">
+    <p>Provide a MAC Adress to create a Solid Pod for and receive the Web ID of the created Pod</p>
+    <fieldset>
+        <legend>API Version</legend>
+        <label>
+            <select name="api-version">
+                <option value="v0.5">v0.5</option>
+                <option selected value="">latest</option>
+            </select>
+        </label>
+    </fieldset>
+    <fieldset>
+        <legend>MAC Address</legend>
+        <label>
+            <input name="mac" placeholder="00000ABB28FC" required type="text" value="{mac}">
+        </label>
+    </fieldset>
+    <button type="submit">Register</button>
+</form>

@@ -73,6 +73,20 @@ class DataController extends ApiController
         return $response;
     }
 
+    private function checkMac($mac, $apiKey): array
+    {
+        if (empty($mac)) {
+            $response = $this->errorResponse->unauthorized('Missing MAC header', 'X-MAC-Address header is missing (or empty)');
+        } elseif ($this->filesystem->fileExists('keys/' . $apiKey . '.mac') === false) {
+            // @FIXME: How to check MAC against key?
+            $response = $this->errorResponse->unauthorized('Invalid API key', 'The provided API key is invalid');
+        } else {
+            $response = [];
+        }
+
+        return $response;
+    }
+
     private function handleGetRequest(ServerRequestInterface $request): array
     {
         $version = $this->getRequestedVersion($request);
@@ -171,6 +185,16 @@ class DataController extends ApiController
             } else {
                 $auth = $request->getHeaderLine('Authorization');
                 $apiKey = substr($auth, 7); // 7 chars = `Bearer `
+
+                if ($version >= 0.5) {
+                    // To prevent API key brute force attack, the MAC address must also be provided
+                    $mac = $request->getHeaderLine('X-MAC-Address');
+                    $authError = $this->checkMac($mac, $apiKey);
+
+                    if ($authError !== []) {
+                        return $authError;
+                    }
+                }
             }
         }
 
