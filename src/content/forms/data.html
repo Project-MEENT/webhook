@@ -5,7 +5,8 @@
     </p>
     <fieldset data-js="headers">
         <legend>Headers (sent by dongle)</legend>
-        <label>Authorization<input name="Authorization" placeholder="Bearer <token>" type="text"></label>
+        <label>Authorization<input name="Authorization" placeholder="Bearer <token>" type="text" value="{bearer}"></label>
+        <label>X-MAC-Address<input name="X-MAC-Address" placeholder="00000ABB28FC" type="text" value="{mac}"></label>
     </fieldset>
     <fieldset>
         <legend>API Version</legend>
@@ -17,6 +18,7 @@
                     <option value="v0.2">v0.2</option>
                     <option value="v0.3">v0.3</option>
                     <option value="v0.4">v0.4</option>
+                    <option value="v0.5">v0.5</option>
                 </optgroup>
                 <option selected value="">latest</option>
             </select>

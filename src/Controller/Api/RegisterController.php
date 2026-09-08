@@ -32,7 +32,7 @@ class RegisterController extends ApiController
                         $form = str_replace(array_keys($replace), $replace, $formContents);
 
                         $content = $this->createContent(
-                            'Provide consent',
+                            'Register Dongle',
                             '<p>To connect your P1 dongle to a Solid Pod, please provide the URL of your Solid WebID</p>',
                             "<section>$form</section><section><output></output></section>",
                             'forms/form.js',
@@ -93,6 +93,12 @@ class RegisterController extends ApiController
                 $filePath = 'keys/' . $apiKey . '.key';
 
                 $isConnected = true;
+                if ($version >= 0.5) {
+                    // @FIXME: How can we check whether we ARE a trusted client?
+                    //         Is it enought to check if there is a *.mac file with the webid in it?
+                    //         Or should we create a webid-hash.mac file with the MAC in it (and check that)?
+                    // If we are a trusted client, we are always "connected"
+                } else
                 if ($version >= 0.4) {
                     $isConnected = $this->solidClient->isWebIdConnected($webId);
 

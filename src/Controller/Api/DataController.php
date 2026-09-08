@@ -3,13 +3,19 @@
 namespace Meent\WebHook\Controller\Api;
 
 use EasyRdf\Graph;
+use League\Flysystem\FilesystemException;
 use Meent\WebHook\Controller\ApiController;
+use Meent\WebHook\Exception\RuntimeException;
 use Meent\WebHook\Exception\SolidException;
 use Meent\WebHook\Record;
 use Psr\Http\Message\ServerRequestInterface;
 
 class DataController extends ApiController
 {
+
+    private const ERROR_COULD_NOT_DELETE_LOCAL_COPY = 'Error deleting local file "%s": %s';
+    private const ERROR_COULD_NOT_WRITE_TO_POD = 'Could not write resource "%s" to Solid Pod: %s. Local copy has been kept at: "%s"';
+
     //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function handleRequest(ServerRequestInterface $request): array
@@ -56,10 +62,8 @@ class DataController extends ApiController
         $auth = $request->getHeaderLine('Authorization');
         $apiKey = substr($auth, 7); // 7 chars = `Bearer `
 
-        if (! isset($this->adminSession)) {
-            throw new \RuntimeException('Cannot handle request before AdminSession is set');
-        } elseif ($this->adminSession->isAuthenticated() === '') {
-            $response = $this->errorResponse->unauthorized('Not authenticated', 'No active session found, please log in first');
+        if (isset($this->adminSession) && $this->adminSession->isAuthenticated() !== '') {
+            $response = [];
         } elseif (empty($auth)) {
             $response = $this->errorResponse->unauthorized('Missing Authorization header', 'Authorization header is missing (or empty)');
         } elseif (! str_starts_with($auth, 'Bearer ')) {
@@ -73,18 +77,49 @@ class DataController extends ApiController
         return $response;
     }
 
-    private function checkMac($mac, $apiKey): array
+    private function checkMac($mac, $webId): array
     {
-        if (empty($mac)) {
-            $response = $this->errorResponse->unauthorized('Missing MAC header', 'X-MAC-Address header is missing (or empty)');
-        } elseif ($this->filesystem->fileExists('keys/' . $apiKey . '.mac') === false) {
-            // @FIXME: How to check MAC against key?
-            $response = $this->errorResponse->unauthorized('Invalid API key', 'The provided API key is invalid');
+        if (! $this->filesystem->fileExists('keys/' . $mac . '.mac')) {
+            $response = $this->errorResponse->unauthorized('Invalid MAC address', 'The provided MAC address is invalid');
+        } elseif ($this->filesystem->read('keys/' . $mac . '.mac') !== $webId) {
+            $response = $this->errorResponse->forbidden('', "Provided MAC '$mac' is not valid for given webId '$webId'");
         } else {
             $response = [];
         }
 
         return $response;
+    }
+
+    private function getClosure(mixed $turtle, string $url, string $webIdUrl, string $filePath): \Closure
+    {
+        return function () use ($turtle, $url, $webIdUrl, $filePath) {
+            try {
+                $response = $this->solidClient->storeResource(
+                    $webIdUrl,
+                    $url,
+                    $turtle,
+                    'text/turtle'
+                );
+            } catch (SolidException $e) {
+                $message = vsprintf(self::ERROR_COULD_NOT_WRITE_TO_POD, [
+                    'resource' => $url,
+                    'error' => $e->getMessage(),
+                    'local-copy' => $filePath,
+                ]);
+
+                throw RuntimeException::create($message, $e);
+            }
+
+            if ($response) {
+                try {
+                    // Remove local copy, as the raw data has been saved in the Pod
+                    $this->filesystem->delete($filePath);
+                } catch (FilesystemException $e) {
+                    $message = vsprintf(self::ERROR_COULD_NOT_DELETE_LOCAL_COPY, [$filePath, $e->getMessage()]);
+                    throw RuntimeException::create($message, $e);
+                }
+            }
+        };
     }
 
     private function handleGetRequest(ServerRequestInterface $request): array
@@ -93,7 +128,9 @@ class DataController extends ApiController
         $queryParams = $request->getQueryParams();
 
         if ($version >= 0.4 && ! $request->getHeaderLine('Authorization') && ! isset($queryParams['webid'])) {
-            $form = file_get_contents(__DIR__ . '/../../content/forms/data.html');
+            $replace = ['{bearer}' => 'Bearer ' . ($queryParams['bearer'] ?? ''), '{mac}' => $queryParams['mac'] ?? ''];
+            $formContents = file_get_contents(__DIR__ . '/../../content/forms/data.html');
+            $form = str_replace(array_keys($replace), $replace, $formContents);
 
             $content = $this->createContent(
                 'Post content',
@@ -189,10 +226,17 @@ class DataController extends ApiController
                 if ($version >= 0.5) {
                     // To prevent API key brute force attack, the MAC address must also be provided
                     $mac = $request->getHeaderLine('X-MAC-Address');
-                    $authError = $this->checkMac($mac, $apiKey);
 
-                    if ($authError !== []) {
-                        return $authError;
+                    if (empty($mac)) {
+                        return $this->errorResponse->unauthorized('Missing MAC header', 'X-MAC-Address header is missing (or empty)');
+                    } else {
+                        $webId = $this->filesystem->read('keys/' . $apiKey . '.key');
+
+                        $authError = $this->checkMac($mac, $webId);
+
+                        if ($authError !== []) {
+                            return $authError;
+                        }
                     }
                 }
             }
@@ -286,22 +330,34 @@ class DataController extends ApiController
                             return $this->errorResponse->internalServerError('Data conversion error', 'Could not convert data to Turtle: ' . $e->getMessage());
                         }
 
-                        try {
-                            $result = $this->solidClient->storeResource($webIdUrl, $url, $turtle, 'text/turtle');
-                        } catch (SolidException $e) {
-                            return $this->errorResponse->badGateway('Solid write error', 'Could not write resource to Solid Pod: ' . $e->getMessage());
-                        }
+                        if ($version >= 0.5) {
+                            // As the dongle cannot do anything about write failure, it should not be made to wait.
+                            return [
+                                'content' => ['interval' => 'PT5M'],
+                                'status' => 202,
+                                'title' => 'Accepted',
+                                'callback' => $this->getClosure($turtle, $url, $webIdUrl, $filePath)
+                            ];
+                        } else {
+                            try {
+                                $this->solidClient->storeResource($webIdUrl, $url, $turtle, 'text/turtle');
+                            } catch (SolidException $e) {
+                                return $this->errorResponse->badGateway('Solid write error', 'Could not write resource to Solid Pod: ' . $e->getMessage());
+                            }
 
-                        // Remove local copy, as the raw data has been saved in the Pod
-                        try {
-                            $this->filesystem->delete($filePath);
-                        } catch (\Throwable $e) {
-                            // We do not care if the delete fails, as the "retry" logic can handle this later
-                            // The retry logic should first check if the file hasn't already been written to the remote.
-                        }
+                            // Remove local copy, as the raw data has been saved in the Pod
+                            try {
+                                $this->filesystem->delete($filePath);
+                            } catch (FilesystemException $e) {
+                                // We do not care if the delete fails, as the "retry" logic can handle this later
+                                // The retry logic should first check if the file hasn't already been written to the remote.
+                                $message = vsprintf(self::ERROR_COULD_NOT_DELETE_LOCAL_COPY, [$filePath, $e->getMessage()]);
+                                error_log($message . ': ' . $e->getMessage());
+                            }
 
-                        // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
-                        $redirectUri = $url;
+                            // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
+                            $redirectUri = $url;
+                        }
                     }
                 } elseif ($version >= 0.3) {
                     // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
