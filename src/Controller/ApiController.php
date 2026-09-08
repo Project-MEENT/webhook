@@ -133,6 +133,26 @@ class ApiController extends AbstractController
 
     ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
+    final protected function createContainer($storageUrl, $webIdUrl)
+    {
+        $containerUrl = vsprintf('%s/%s/', [
+            'root' => rtrim($storageUrl, '/'),
+            'path' => 'MEENT/p1',
+        ]);
+
+        $solidResponse = $this->solidClient->storeResource(
+            $webIdUrl,
+            rtrim($containerUrl, '/') . '/README.md',
+            'This Container is where all P1 dongle data is written.'
+        );
+
+        $storageFilePath = vsprintf('/storage-urls/%s.url', [
+            'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
+        ]);
+
+        $this->filesystem->write($storageFilePath, $storageUrl);
+    }
+
     final protected function getBaseUrl(ServerRequestInterface $request): string
     {
         return $request->getUri()->getScheme() . '://'

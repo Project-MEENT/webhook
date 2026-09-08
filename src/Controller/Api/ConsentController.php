@@ -49,21 +49,7 @@ class ConsentController extends ApiController
                         $storageUrl = reset($storageUrls);
                     }
 
-                    $containerUrl = vsprintf('%s/%s/', [
-                        'root' => rtrim($storageUrl, '/'),
-                        'path' => 'MEENT/p1',
-                    ]);
-
-                    $solidResponse = $this->solidClient->storeResource(
-                        $webIdUrl,
-                        rtrim($containerUrl, '/') . '/README.md',
-                        'This Container is where all P1 dongle data is written.'
-                    );
-
-                    $storageFilePath = vsprintf('/storage-urls/%s.url', [
-                        'webIdHash' => $this->hashUrl($webIdUrl, 'sha1'),
-                    ]);
-                    $this->filesystem->write($storageFilePath, $storageUrl);
+                    $this->createContainer($storageUrl, $webIdUrl);
 
                     $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
                 } elseif (! $webIdUrl) {
