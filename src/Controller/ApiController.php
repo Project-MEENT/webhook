@@ -44,7 +44,7 @@ class ApiController extends AbstractController
     private const SUBJECT_REGISTER = 'register';
 
     protected AdminSession $adminSession;
-    protected HttpClientInterface $httpClient;
+    protected ?HttpClientInterface $httpClient;
     protected Session $session;
 
     ///////////////////////////// GETTERS & SETTERS \\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -97,7 +97,7 @@ class ApiController extends AbstractController
             break;
 
             case self::SUBJECT_POD_CREATION:
-                if ($version >= 0.5) {
+                if ($version >= 0.5 && isset($this->httpClient)) {
                     $controller = new PodCreationController($this->filesystem, $this->solidClient, $this->errorResponse);
                     $controller->setHttpClient($this->httpClient);
                 } else {
