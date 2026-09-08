@@ -13,6 +13,7 @@
     "name": "meent/webhook",
     "require": {
         "php": "^8.2",
+        "ext-curl": "*",
         "ext-json": "*",
         "ext-mbstring": "*",
         "ext-openssl": "*",

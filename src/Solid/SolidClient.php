@@ -576,7 +576,7 @@ class SolidClient
         $state = vsprintf("%s.%s.%s", [
             $header,
             $payload,
-            $signature
+            $signature,
         ]);
 
         if ($this->config->get(SolidClientConfig::USE_CSRF) === true) {

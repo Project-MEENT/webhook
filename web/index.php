@@ -256,7 +256,7 @@ $content = $response['content'] ?? null;
 if (isset($response['headers']['Content-Type'])) {
     // As the content-type is already set, just output the provided $content.
     // @KLUDGE: See the @FIXME at the `switch ($rootPath)` case for OidcClientConfig::METADATA_FILE (+/- line 145)
-} else if ($outputType === 'html') {
+} elseif ($outputType === 'html') {
     $response['headers']['Content-Type'] = ['text/html; charset=utf-8'];
 
     if (is_array($content) || ! empty($response['title'])) {
