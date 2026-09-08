@@ -340,5 +340,36 @@ array_walk($response['headers'], static function ($values, $name) {
     });
 });
 header_remove('X-Powered-By');
+if (isset($response['callback'])) {
+    // There is an action that needs to be called after the response has been output.
+    // Make sure the response has been flushed and call the callback
+    if (session_id()) {
+        session_write_close();
+    }
+
+    if (function_exists('fastcgi_finish_request')) {
+        // Modern Setup (PHP-FPM)
+        fastcgi_finish_request();
+    } else {
+        // Legacy Setup (Apache + mod_php)
+        // Force the browser to close connection by telling it exactly how many bytes to expect
+        @ini_set('zlib.output_compression', 'Off');
+        header('Content-Encoding: none');
+        header('Content-Length: ' . mb_strlen(trim((string) $content)));
+        header('Connection: close');
+    }
+}
+
 echo trim((string) $content);
+
+if (isset($response['callback'])) {
+    flush();
+
+    try {
+        $response['callback']();
+    } catch (\Throwable $e) {
+        error_log('Error in callback (' . get_class($e) . ') ' . $e->getMessage());
+    }
+}
+
 exit;

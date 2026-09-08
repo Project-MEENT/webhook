@@ -41,6 +41,11 @@ class SolidClient
     private RegistrationService $registration;
     private SolidClientConfig $config;
 
+    final public function getClientId()
+    {
+        return $this->oidcConfig->get(OidcClientConfig::CLIENT_ID);
+    }
+
     //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(
@@ -297,6 +302,17 @@ class SolidClient
             $message = $e->getResponse()->getBody()->getContents();
             throw SolidException::create("Could not fetch resource '$resourceUrl': $message", $e);
         }
+    }
+
+    final public function persistGrantForWebId(string $webIdUrl, array $grant): void
+    {
+        $issuer = $this->createIssuerFromWebIdUrl($webIdUrl);
+
+        $grant = array_filter($grant, static function ($value) {
+            return $value !== null && $value !== '';
+        });
+
+        $this->saveOfflineGrant($issuer, $webIdUrl, $grant);
     }
 
     final public function storeResource($webIdUrl, $resourceUrl, $resource = null, $contentType = null): ResponseInterface

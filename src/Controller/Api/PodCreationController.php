@@ -59,14 +59,14 @@ class PodCreationController extends ApiController
                     throw new \RuntimeException('Required dependency HTTP Client is not set');
                 }
 
-                $response = $this->handleRegisterPost($request);
+                $response = $this->handlePost($request);
             break;
         }
 
         return $response;
     }
 
-    private function handleRegisterPost(ServerRequestInterface $request): array
+    private function handlePost(ServerRequestInterface $request): array
     {
         $input = $request->getBody()->getContents();
 
@@ -82,22 +82,44 @@ class PodCreationController extends ApiController
             $response = $this->errorResponse->conflict('MAC already registered', "The provided MAC Address '$mac' has already been registered");
         } else {
             try {
-                $response = $this->httpClient->request('POST', '', [
-                    'form_params' => ['password' => $mac],
+                $clientResponse = $this->httpClient->request('POST', '', [
+                    'form_params' => [
+                        'client_id' => $this->solidClient->getClientId(),
+                        'password' => $mac,
+                    ],
                 ]);
-                $webId = $response->getHeaderLine('Location');
+
+                $contents = $clientResponse->getBody()->getContents();
+
+                $json = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+
+                if (! isset($json['webId'], $json['storageUrl'], $json['access_token'], $json['refresh_token'])) {
+                    $response = $this->errorResponse->badGateway(
+                        'Error creating Solid Pod',
+                        "Error creating Solid Pod: response does not contain 'webId', 'storageUrl', 'access_token' and 'refresh_token' keys: ".$contents,
+                        '#solid-create-error'
+                    );
+                } else {
+                    $grant = [
+                        'solid_access_token' => $json['access_token'],
+                        'solid_refresh_token' => $json['refresh_token'] ?? null,
+                        'solid_token_expiry' => time() + ($json['expires_in'] ?? 3600),
+                        'solid_webid' => $json['webId'],
+                        'saved_at' => time(),
+                    ];
+
+                    $this->solidClient->persistGrantForWebId($json['webId'], $grant);
+
+                    $this->createContainer($json['storageUrl'], $json['webId']);
+                    $this->filesystem->write($filePath, $json['webId']);
+
+                    $webId = $json['webId'];
+                }
             } catch (\Throwable $e) {
                 $response = $this->errorResponse->badGateway('Error creating Solid Pod', 'Error creating Solid Pod: ' . $e->getMessage(), '#solid-create-error');
             }
 
-            if (empty($webId)) {
-                var_dump($response);
-                die;
-            } else {
-                var_dump($response->getBody()->getContents());
-                die;
-                $this->filesystem->write($filePath, $webId);
-
+            if (! empty($webId)) {
                 $response = [
                     'content' => ['webid' => $webId],
                     'status' => 201,
