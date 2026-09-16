@@ -35,8 +35,11 @@ class ConsentController extends ApiController
                 } elseif (isset($queryParams['error'])) {
                     $response = $this->errorResponse->badGateway('Provider Error', 'The Provider returned an error: "' . urldecode($queryParams['error']) . '"');
                 } elseif ($isRedirect) {
-                    $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
-                    $webIdUrl = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
+                    $webIdUrl = $this->solidClient->handleRedirect(
+                        $queryParams,
+                        $this->session,
+                        $this->getBaseUrl() . '/consent',
+                    );
 
                     $storageUrls = $this->solidClient->fetchStorageUrls($webIdUrl);
 
@@ -51,7 +54,7 @@ class ConsentController extends ApiController
 
                     $this->createContainer($storageUrl, $webIdUrl);
 
-                    $redirectUri = $this->getBaseUrl($request) . '/api/consent?connected=' . urlencode($webIdUrl);
+                    $redirectUri = $this->getBaseUrl() . '/api/consent?connected=' . urlencode($webIdUrl);
                 } elseif (! $webIdUrl) {
                     $form = file_get_contents(__DIR__ . '/../../content/forms/consent.html');
 

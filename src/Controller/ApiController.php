@@ -4,6 +4,7 @@ namespace Meent\WebHook\Controller;
 
 use League\Flysystem\FilesystemOperator;
 use Meent\WebHook\AdminSession;
+use Meent\WebHook\Config;
 use Meent\WebHook\Controller\Api\ConsentController;
 use Meent\WebHook\Controller\Api\DataController;
 use Meent\WebHook\Controller\Api\PodCreationController;
@@ -70,6 +71,7 @@ class ApiController extends AbstractController
         protected FilesystemOperator $filesystem,
         protected SolidClient $solidClient,
         protected ErrorResponse $errorResponse,
+        protected Config $config,
     ) {}
 
     public function handleRequest(ServerRequestInterface $request): array
@@ -84,7 +86,12 @@ class ApiController extends AbstractController
         switch ($subject) {
             case self::SUBJECT_CONSENT:
                 if ($version >= 0.4) {
-                    $controller = new ConsentController($this->filesystem, $this->solidClient, $this->errorResponse);
+                    $controller = new ConsentController(
+                        $this->filesystem,
+                        $this->solidClient,
+                        $this->errorResponse,
+                        $this->config,
+                    );
                     $controller->setSession($this->session);
                 } else {
                     $response = $this->handleNotFound($request);
@@ -92,13 +99,23 @@ class ApiController extends AbstractController
             break;
 
             case self::SUBJECT_DATA:
-                $controller = new DataController($this->filesystem, $this->solidClient, $this->errorResponse);
+                $controller = new DataController(
+                    $this->filesystem,
+                    $this->solidClient,
+                    $this->errorResponse,
+                    $this->config,
+                );
                 $controller->setAdminSession($this->adminSession);
             break;
 
             case self::SUBJECT_POD_CREATION:
                 if ($version >= 0.5 && isset($this->httpClient)) {
-                    $controller = new PodCreationController($this->filesystem, $this->solidClient, $this->errorResponse);
+                    $controller = new PodCreationController(
+                        $this->filesystem,
+                        $this->solidClient,
+                        $this->errorResponse,
+                        $this->config,
+                    );
                     $controller->setHttpClient($this->httpClient);
                 } else {
                     $response = $this->handleNotFound($request);
@@ -106,7 +123,12 @@ class ApiController extends AbstractController
             break;
 
             case self::SUBJECT_REGISTER:
-                $controller = new RegisterController($this->filesystem, $this->solidClient, $this->errorResponse);
+                $controller = new RegisterController(
+                    $this->filesystem,
+                    $this->solidClient,
+                    $this->errorResponse,
+                    $this->config,
+                );
             break;
 
             case self::SUBJECT_ROOT:
@@ -151,13 +173,6 @@ class ApiController extends AbstractController
         ]);
 
         $this->filesystem->write($storageFilePath, $storageUrl);
-    }
-
-    final protected function getBaseUrl(ServerRequestInterface $request): string
-    {
-        return $request->getUri()->getScheme() . '://'
-            . $request->getUri()->getHost()
-            . ($request->getUri()->getPort() ? ':' . $request->getUri()->getPort() : '');
     }
 
     private function getLatestVersion()
@@ -233,8 +248,7 @@ class ApiController extends AbstractController
 
     private function handleRootRequest(ServerRequestInterface $request)
     {
-        $uriRoot = $this->getBaseUrl($request);
-        $apiRoot = $uriRoot . '/api/';
+        $apiRoot = $this->getBaseUrl() . '/api/';
 
         $data = [
             'available_versions' => self::AVAILABLE_VERSIONS,
@@ -242,10 +256,11 @@ class ApiController extends AbstractController
                 'api_url' => $apiRoot,
                 'consent_url' => $apiRoot . self::SUBJECT_CONSENT,
                 'data_url' => $apiRoot . self::SUBJECT_DATA,
+                'pod_creation_url' => $apiRoot . self::SUBJECT_POD_CREATION,
                 'registration_url' => $apiRoot . self::SUBJECT_REGISTER,
 
             ],
-            'documentation_url' => "$uriRoot/docs",
+            'documentation_url' => $this->getBaseUrl() . '/docs',
         ];
 
         return ['content' => $data, 'title' => 'MEENT Webhook API', 'status' => 200];

@@ -5,6 +5,7 @@ namespace Meent\WebHook;
 use GuzzleHttp\Client as HttpClient;
 use GuzzleHttp\HandlerStack;
 use Laminas\Diactoros\ServerRequestFactory;
+use Laminas\Diactoros\Uri;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\Local\LocalFilesystemAdapter;
@@ -103,14 +104,14 @@ $rootPath = $pathParts[0] ?? '';
 // Clean up no longer needed variables
 unset($accept, $acceptHeader, $apiKey, $pathParts, $queryParams);
 
-$baseUrl = $request->getUri()->withPath('')->withFragment('')->withQuery('');
+$baseUrl = new Uri($config->get(Config::BASE_URL));
 
 if (! $clientFilesystem->fileExists(OidcClientConfig::METADATA_FILE)) {
     // Client metadata file not found, creating...
     $values = [
         OidcClientConfig::CLIENT_ID => (string) $baseUrl->withPath('/' . OidcClientConfig::METADATA_FILE),
         OidcClientConfig::CLIENT_NAME => $config->get(Config::CLIENT_NAME),
-        OidcClientConfig::CLIENT_URI => (string) $baseUrl,
+        OidcClientConfig::CLIENT_URI => (string) $baseUrl, // @TODO: Shouldn't this be + /docs/ (?)
         OidcClientConfig::REDIRECT_URIS => [
             (string) $baseUrl->withPath('/api/consent'),
             (string) $baseUrl->withPath('/admin'),
@@ -177,7 +178,8 @@ switch ($rootPath) {
         $controller = new ApiController(
             $dataFilesystem,
             $solidClient,
-            $errorResponse
+            $errorResponse,
+            $config,
         );
 
         $controller->setAdminSession($adminSession);
@@ -219,7 +221,7 @@ switch ($rootPath) {
             $adminSession,
             $webIdInformationService,
             $errorResponse,
-            $config
+            $config,
         );
 
         $response = $controller->handleRequest($request);
@@ -230,7 +232,8 @@ switch ($rootPath) {
     case 'errors':
         $controller = new DocsController(
             new \League\CommonMark\GithubFlavoredMarkdownConverter(),
-            $errorResponse
+            $errorResponse,
+            $config,
         );
         $response = $controller->handleRequest($request);
     break;

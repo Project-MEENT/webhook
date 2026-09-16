@@ -2,6 +2,7 @@
 
 namespace Meent\WebHook\Controller;
 
+use Meent\WebHook\Config;
 use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception\RuntimeException;
 use Psr\Http\Message\ServerRequestInterface;
@@ -18,6 +19,7 @@ abstract class AbstractController
         'title' => '',
     ];
 
+    protected Config $config;
     protected ErrorResponse $errorResponse;
 
     abstract public function handleRequest(ServerRequestInterface $request);
@@ -51,6 +53,11 @@ abstract class AbstractController
         $template = $this->getContents('template');
 
         return vsprintf($template, $context);
+    }
+
+    final protected function getBaseUrl(): string
+    {
+        return $this->config->get(Config::BASE_URL);
     }
 
     final protected function getContents(string $subject)

@@ -361,7 +361,7 @@ class DataController extends ApiController
                     }
                 } elseif ($version >= 0.3) {
                     // For 201 (Created) responses, the Location value refers to the primary resource created by the request. (RFC-9110, Sections 10.2.2 and 15.3.2)
-                    $redirectUri = $this->getBaseUrl($request) . '/api/data/' . $filePath;
+                    $redirectUri = $this->getBaseUrl() . '/api/data/' . $filePath;
                 } else {
                     $data = $input;
                     $message .= ' to ' . $filePath;

@@ -3,6 +3,7 @@
 namespace Meent\WebHook\Controller;
 
 use League\CommonMark\ConverterInterface;
+use Meent\WebHook\Config;
 use Meent\WebHook\ErrorResponse;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -13,15 +14,14 @@ class DocsController extends AbstractController
     private const SUBJECT_CONTENT = 'docs';
     private const SUBJECT_ERROR = 'errors';
 
-    private ConverterInterface $converter;
 
     //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-    final public function __construct(ConverterInterface $converter, ErrorResponse $errorResponse)
-    {
-        $this->converter = $converter;
-        $this->errorResponse = $errorResponse;
-    }
+    final public function __construct(
+        private ConverterInterface $converter,
+        protected ErrorResponse $errorResponse,
+        protected Config $config,
+    ) {}
 
     final public function handleRequest(ServerRequestInterface $request): array
     {

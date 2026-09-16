@@ -11,6 +11,7 @@ class Config extends AbstractConfig
 
     final public const ADMIN_WEBIDS = 'admin_webids';
     final public const API_STORAGE_PATH = 'api_storage_path';
+    final public const BASE_URL = 'base_url';
     final public const CLIENT_NAME = 'client_name';
     final public const JWT_TTL = 'jwt_ttl';
     final public const METADATA_CACHE_TTL = 'metadata_cache_ttl';
@@ -26,6 +27,7 @@ class Config extends AbstractConfig
         return [
             self::ADMIN_WEBIDS => 'List of allowed admin WebID URLs',
             self::API_STORAGE_PATH => 'Used for persistent storage of data posted to the API',
+            self::BASE_URL => 'Base URL of the API, used for constructing URLs (client_id, client_uri, redirec_uri, etc.) in responses',
             self::CLIENT_NAME => 'Name of the OIDC client to register with the OP',
             self::JWT_TTL => 'Expiration time of OAuth state JWTs, in seconds.',
             self::METADATA_CACHE_TTL => 'Expiration time of the OIDC metadata cache, in seconds',

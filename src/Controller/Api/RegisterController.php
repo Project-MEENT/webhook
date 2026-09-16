@@ -103,7 +103,7 @@ class RegisterController extends ApiController
                     $isConnected = $this->solidClient->isWebIdConnected($webId);
 
                     if (! $isConnected) {
-                        $connectionUrl = $request->getUri()->withPath('/api/consent')->withQuery('webid=' . urlencode($webId));
+                        $connectionUrl = $this->getBaseUrl() . '/api/consent?webid=' . urlencode($webId);
                         $response = $this->errorResponse->proxyAuthenticationRequired('WebID Authentication Required', "The provided WebID '$webId' is not yet connected. To connect this WebID, visit: $connectionUrl", '#webid-not-connected');
                         // @CHECKME: Add Location header?
                         // $response['headers']['Location'] = [$connectionUrl];

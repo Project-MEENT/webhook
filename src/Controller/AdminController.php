@@ -23,7 +23,6 @@ class AdminController extends AbstractController
     private const SUBJECT_MANAGE = 'manage';
 
     private AdminSession $adminSession;
-    private Config $config;
     private Session $session;
     private SolidClient $solidClient;
     private WebIdInformation $webIdInformation;
@@ -133,6 +132,11 @@ class AdminController extends AbstractController
 HTML;
     }
 
+    private function getRedirectUrl(): string
+    {
+        return $this->getBaseUrl() . '/admin';
+    }
+
     private function handleInvalidCsrf()
     {
         return $this->errorResponse->forbidden('CSRF Error', 'Invalid or missing CSRF token.');
@@ -192,9 +196,8 @@ HTML;
             break;
             case 'GET':
                 // GET /admin/login redirects to /admin/ (the form is there)
-                $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
                 $response = [
-                    'headers' => ['Location' => [$redirectUri]],
+                    'headers' => ['Location' => [ $this->getRedirectUrl() ]],
                     'status' => 302,
                 ];
             break;
@@ -229,10 +232,8 @@ HTML;
                 } else {
                     $this->adminSession->stop();
                     session_regenerate_id(true);
-
-                    $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
                     $response = [
-                        'headers' => ['Location' => [$redirectUri]],
+                        'headers' => ['Location' => [ $this->getRedirectUrl() ]],
                         'status' => 302,
                     ];
                 }
@@ -273,8 +274,9 @@ HTML;
     private function handleRedirectRequest(ServerRequestInterface $request)
     {
         $queryParams = $request->getQueryParams();
-        $currentUrl = $request->getUri()->withFragment('')->withQuery('')->__toString();
-        $authenticatedWebId = $this->solidClient->handleRedirect($queryParams, $this->session, $currentUrl);
+        $redirectUri = $this->getRedirectUrl();
+
+        $authenticatedWebId = $this->solidClient->handleRedirect($queryParams, $this->session, $redirectUri);
 
         if (! $this->adminSession->isAdmin($authenticatedWebId)) {
             $this->adminSession->stop();
@@ -285,10 +287,8 @@ HTML;
             );
         } else {
             $this->adminSession->start($authenticatedWebId);
-
-            $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
             $response = [
-                'headers' => ['Location' => [$redirectUri]],
+                'headers' => ['Location' => [ $redirectUri ]],
                 'status' => 302,
             ];
         }
@@ -387,9 +387,7 @@ HTML;
             $this->config->save($config);
         }
 
-        $redirectUri = $request->getUri()->withPath('/admin')->withFragment('')->withQuery('')->__toString();
-
-        return ['headers' => ['Location' => [$redirectUri]], 'status' => 303,];
+        return ['headers' => ['Location' => [ $this->getRedirectUrl() ]], 'status' => 303,];
     }
 
     private function hasValidCsrf(ServerRequestInterface $request): bool
