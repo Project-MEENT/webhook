@@ -99,14 +99,17 @@ class AdminController extends AbstractController
         $webIdsInfo = array_map(function ($info) use ($template) {
             $webId = $info['webid'] ?? '';
 
+            $hasConsent = $info['has_consent'];
             $isAdmin = $this->adminSession->isAdmin($webId);
             $isDongleRegistered = ! empty($info['api_key']);
             $webIdHash = $this->hashUrl($webId, 'sha1');
 
             // if $webId is from a Solid server where we are a trusted app, consent is also present.
             $podCreationUrl = $this->config->get(Config::POD_CREATION_URL);
-            $host = parse_url($podCreationUrl, PHP_URL_HOST);
-            $hasConsent = str_contains($webId, $host) || $info['has_consent'];
+            if ($podCreationUrl) {
+                $host = parse_url($podCreationUrl, PHP_URL_HOST);
+                $hasConsent = str_contains($webId, $host) || $hasConsent;
+            }
 
             return vsprintf($template, [
                 '%1$s' => $webId,
