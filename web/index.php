@@ -323,6 +323,7 @@ if (isset($response['headers']['Content-Type'])) {
 JSON;
 
         $content = vsprintf($body, [
+            'type' => $body['type'] ?? '/errors/',
             // @TODO: Encode message to not break JSON
             'json-error' => $e->getMessage(),
         ]);
