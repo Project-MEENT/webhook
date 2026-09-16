@@ -332,8 +332,10 @@ class DataController extends ApiController
 
                         if ($version >= 0.5) {
                             // As the dongle cannot do anything about write failure, it should not be made to wait.
+
+                            $interval = new \DateInterval('PT5M');
                             return [
-                                'content' => ['interval' => 'PT5M'],
+                                'content' => ['interval' => $interval->format('%s')],
                                 'status' => 202,
                                 'title' => 'Accepted',
                                 'callback' => $this->getClosure($turtle, $url, $webIdUrl, $filePath)
