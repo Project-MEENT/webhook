@@ -120,7 +120,7 @@ class PodCreationController extends ApiController
                 } else {
                     $grant = [
                         'solid_access_token' => $json['access_token'],
-                        'solid_refresh_token' => $json['refresh_token'] ?? null,
+                        'solid_refresh_token' => $json['refresh_token'],
                         'solid_token_expiry' => time() + ($json['expires_in'] ?? 3600),
                         'solid_webid' => $json['webId'],
                         'saved_at' => time(),
