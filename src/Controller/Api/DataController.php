@@ -335,7 +335,7 @@ class DataController extends ApiController
 
                             $interval = new \DateInterval('PT5M');
                             return [
-                                'content' => ['interval' => $interval->format('%s')],
+                                'content' => ['interval' => $interval->format('%i') * 60],
                                 'status' => 202,
                                 'title' => 'Accepted',
                                 'callback' => $this->getClosure($turtle, $url, $webIdUrl, $filePath)
