@@ -1,7 +1,7 @@
 ---
 services:
   webhook:
-    image: ghcr.io/project-meent/webhook:v0.5.4
+    image: ghcr.io/project-meent/webhook:v0.5.5
     ports:
       - 127.0.0.1:9083:80
     volumes:
@@ -10,7 +10,7 @@ services:
       - ./data/solid-client:/app/data/solid-client
 
   change-webhook:
-    image: ghcr.io/project-meent/webhook:v0.5.4
+    image: ghcr.io/project-meent/webhook:v0.5.5
     volumes:
       - ./config.php:/app/config.php
       - ./data/api:/app/data/api
