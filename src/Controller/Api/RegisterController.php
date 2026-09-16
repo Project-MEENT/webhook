@@ -3,6 +3,7 @@
 namespace Meent\WebHook\Controller\Api;
 
 use Meent\WebHook\Controller\ApiController;
+use Meent\WebHook\MacInformation;
 use Psr\Http\Message\ServerRequestInterface;
 
 class RegisterController extends ApiController
@@ -78,19 +79,18 @@ class RegisterController extends ApiController
 
         $webId = trim($input);
 
+        $webIdHash = $this->hashUrl($webId, 'sha1');
+        $webIdExists = $this->filesystem->directoryExists($webIdHash);
+
         if (empty($webId)) {
             $response = $this->errorResponse->unprocessableEntity('No data received', 'No data received');
         } elseif (filter_var($webId, FILTER_VALIDATE_URL) === false) {
             $response = $this->errorResponse->unprocessableEntity('Invalid URL', "Provided WebID '$webId' is not a valid URL");
         } else {
-            $webIdHash = $this->hashUrl($webId, 'sha1');
-            $exists = $this->filesystem->directoryExists($webIdHash);
-
-            if ($exists) {
-                $response = $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered"); // @TODO: use PUT for updates
+            if ($webIdExists && $version <= 0.4) {
+                $response = $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered");
             } else {
                 $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
-                $filePath = 'keys/' . $apiKey . '.key';
 
                 $isConnected = true;
                 if ($version >= 0.5) {
@@ -98,8 +98,26 @@ class RegisterController extends ApiController
                     //         Is it enought to check if there is a *.mac file with the webid in it?
                     //         Or should we create a webid-hash.mac file with the MAC in it (and check that)?
                     // If we are a trusted client, we are always "connected"
-                } else
-                if ($version >= 0.4) {
+                    $secret = $request->getHeaderLine('X-Client-Secret');
+                    $secretHash = hash_hmac('sha256', $secret, '', true);
+
+                    if (empty($secret)) {
+                        $response = $this->errorResponse->unauthorized('Missing secret header', 'X-Client-Secret header is missing (or empty)');
+                    } else{
+                        $macInformation = new MacInformation($this->filesystem);
+                        $mac = $macInformation->getMacForSecretHash($secretHash);
+
+                        if (! $mac) {
+                            $response = $this->errorResponse->notFound('Could not find MAC for given secret');
+                        } elseif (! $this->filesystem->fileExists('keys/' . $mac . '.mac')) {
+                            $response = $this->errorResponse->notFound('Could not find WebID for given MAC', "The provided MAC Address '$mac' has already been registered, but no WebID is present");
+                        } elseif ($this->filesystem->read('keys/' . $mac . '.secret') !== $secretHash) {
+                            $response = $this->errorResponse->forbidden('Invalid secret', "Provided secret is not valid for given MAC '$mac'");
+                        } else {
+                            $webId = $this->filesystem->read('keys/' . $mac . '.mac');
+                        }
+                    }
+                } elseif ($version >= 0.4) {
                     $isConnected = $this->solidClient->isWebIdConnected($webId);
 
                     if (! $isConnected) {
@@ -111,14 +129,22 @@ class RegisterController extends ApiController
                 }
 
                 if ($isConnected === true) {
-                    $this->filesystem->write($filePath, $webId);
-                    $this->filesystem->createDirectory($webIdHash);
+                    $this->filesystem->write('keys/' . $apiKey . '.key', $webId);
+                    if ($this->filesystem->directoryExists($webIdHash)) {
+                        $response = [
+                            'content' => ['api_key' => $apiKey, 'webid' => $webId],
+                            'status' => 200,
+                            'title' => 'WebID already registered',
+                        ];
+                    } else {
+                        $this->filesystem->createDirectory($webIdHash);
 
-                    $response = [
-                        'content' => ['api_key' => $apiKey, 'webid' => $webId],
-                        'status' => 201,
-                        'title' => 'WebID registered',
-                    ];
+                        $response = [
+                            'content' => ['api_key' => $apiKey, 'webid' => $webId],
+                            'status' => 201,
+                            'title' => 'WebID registered',
+                        ];
+                    }
                 }
             }
         }

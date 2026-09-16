@@ -71,15 +71,33 @@ class PodCreationController extends ApiController
         $input = $request->getBody()->getContents();
 
         $mac = trim($input);
-        $filePath = 'keys/' . $mac . '.mac';
+        $secret = $request->getHeaderLine('X-Client-Secret');
+        $secretHash = hash_hmac('sha256', $secret, '', true);
+
+        $secretExists = $this->filesystem->fileExists('keys/' . $mac . '.secret');
+        $macExists = $this->filesystem->fileExists('keys/' . $mac . '.mac');
 
         if (empty($mac)) {
             $response = $this->errorResponse->unprocessableEntity('No data received', 'No data received');
         // @TODO: Check what the MAC format is we receive. If it matches PHP's filter_var, then we can use it.'
         // } elseif (filter_var($mac, FILTER_VALIDATE_MAC) === false) {
         //     $response = $this->errorResponse->unprocessableEntity('Invalid MAC', "Provided MAC Address '$mac' is not valid");
-        } elseif ($this->filesystem->fileExists($filePath) === true) {
-            $response = $this->errorResponse->conflict('MAC already registered', "The provided MAC Address '$mac' has already been registered");
+        } elseif (empty($secret)) {
+            $response = $this->errorResponse->unauthorized('Missing secret header', 'X-Client-Secret header is missing (or empty)');
+        } elseif ($macExists) {
+            if(! $secretExists) {
+                $response = $this->errorResponse->notFound('Could not find secret for given MAC', "The provided MAC Address '$mac' has already been registered, but no secret is present");
+            } elseif ($this->filesystem->read('keys/' . $mac . '.secret') !== $secretHash) {
+                $response = $this->errorResponse->forbidden('Invalid secret', "Provided secret is not valid for given MAC '$mac'");
+            } else {
+                $webId = $this->filesystem->read('keys/' . $mac . '.mac');
+
+                $response = [
+                    'content' => ['webid' => $webId],
+                    'status' => 200,
+                    'title' => 'Solid Pod exists',
+                ];
+            }
         } else {
             try {
                 $clientResponse = $this->httpClient->request('POST', '', [
@@ -111,20 +129,18 @@ class PodCreationController extends ApiController
                     $this->solidClient->persistGrantForWebId($json['webId'], $grant);
 
                     $this->createContainer($json['storageUrl'], $json['webId']);
-                    $this->filesystem->write($filePath, $json['webId']);
 
-                    $webId = $json['webId'];
+                    $this->filesystem->write('keys/' . $mac . '.mac', $json['webId']);
+                    $this->filesystem->write('keys/' . $mac . '.secret', $secretHash);
+
+                    $response = [
+                        'content' => ['webid' => $json['webId']],
+                        'status' => 201,
+                        'title' => 'Solid Pod created',
+                    ];
                 }
             } catch (\Throwable $e) {
                 $response = $this->errorResponse->badGateway('Error creating Solid Pod', 'Error creating Solid Pod: ' . $e->getMessage(), '#solid-create-error');
-            }
-
-            if (! empty($webId)) {
-                $response = [
-                    'content' => ['webid' => $webId],
-                    'status' => 201,
-                    'title' => 'Solid Pod created',
-                ];
             }
         }
 

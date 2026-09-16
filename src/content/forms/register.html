@@ -1,11 +1,16 @@
 <form action="/api/register/" data-js="register-form" method="POST">
     <p>Register a WebID and receive an API key for authenticated data uploads.</p>
+    <fieldset data-js="headers">
+        <legend>Headers (sent by dongle)</legend>
+        <label>X-Client-Secret<input name="X-Client-Secret" placeholder="0a1b2c3d4e5f6a7b8c9d0e0f1a2b3c4d5e6f7a8b9c0d0e1f2a3b4c5d6e7f8a9b" type="text" /></label>
+    </fieldset>
     <fieldset>
         <legend>API Version</legend>
         <label>
             <select name="api-version">
                 <option value="v0.3">v0.3</option>
                 <option value="v0.4">v0.4</option>
+                <option value="v0.5">v0.5</option>
                 <option selected value="">latest</option>
             </select>
         </label>
