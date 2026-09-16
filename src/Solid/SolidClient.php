@@ -331,6 +331,9 @@ class SolidClient
             return $this->httpClient->send($putRequest);
         } catch (\Psr\Http\Client\RequestExceptionInterface $e) {
             $message = $e->getResponse()->getBody()->getContents();
+            if (! $message) {
+                $message = $e->getMessage();
+            }
             throw SolidException::create("Could not store resource '$resourceUrl': $message", $e);
         }
     }
