@@ -5,7 +5,7 @@ Webhook for writing data from a P1 dongle as Linked Data to a Solid Pod.
 ## Installation
 
 For regular use of the webhook, installation is not required.
-Visit the webhook at: https://meent.dev.muze.nl/
+Visit the webhook at: https://webhook.energiemeent.nl/
 
 ## Usage
 
@@ -27,7 +27,7 @@ At this point, contributions are not expected.
 
 ## License
 
-[1]: https://meent.dev.muze.nl/api/
+[1]: https://webhook.energiemeent.nl/api/
 [2]: ./docs/
 [3]: https://w3c-cg.github.io/WebID/spec/identity/
 [4]: https://solid.github.io/webid-profile/
