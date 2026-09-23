@@ -103,6 +103,7 @@ class RegisterController extends ApiController
                     if (empty($secret)) {
                         $response = $this->errorResponse->unauthorized('Missing secret header', 'X-Client-Secret header is missing (or empty)');
                     } else{
+                        // @TODO: The MacInformation class should be injected, not created
                         $macInformation = new MacInformation($this->filesystem);
                         $macs = $macInformation->getMacsForWebId($webId);
 
