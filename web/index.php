@@ -50,10 +50,10 @@ if (getenv('ACCEPT_SELF_SIGNED_CERTIFICATES') !== '') {
 }
 
 // Create FileSystems
-$dataFileSystemAdapter = new LocalFilesystemAdapter($config->get('api_storage_path'));
+$dataFileSystemAdapter = new LocalFilesystemAdapter($config->get(Config::API_STORAGE_PATH));
 $dataFilesystem = new Filesystem($dataFileSystemAdapter);
 
-$clientFilesystemAdapter = new LocalFilesystemAdapter($config->get('solid_storage_path'));
+$clientFilesystemAdapter = new LocalFilesystemAdapter($config->get(Config::SOLID_STORAGE_PATH));
 $clientFilesystem = new Filesystem($clientFilesystemAdapter);
 
 // Create PSR Request and Response objects
