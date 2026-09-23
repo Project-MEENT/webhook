@@ -35,8 +35,8 @@ class MacInformation
     {
         $mac = '';
 
-        $secrets = array_filter($this->getMacSecrets(), function ($secret, $mac) use ($secretHash) {
-            return $this->dataFilesystem->read('keys/' . $mac . '.secret') === $secretHash;
+        $secrets = array_filter($this->getMacSecrets(), function ($secret) use ($secretHash) {
+            return $secret === $secretHash;
         }, ARRAY_FILTER_USE_BOTH);
 
         if (count($secrets) > 0) {
@@ -58,7 +58,7 @@ class MacInformation
             $path = $fileAttribute->path();
 
             if ($fileAttribute->isFile() && str_ends_with($path, '.secret')) {
-                $secretHash = $this->dataFilesystem->read($path);
+                $secretHash = trim($this->dataFilesystem->read($path));
 
                 $mac = basename($path, '.secret');
 
