@@ -126,6 +126,10 @@ class PodCreationController extends ApiController
                         'saved_at' => time(),
                     ];
 
+                    if (isset($json['refresh_expires_in'])) {
+                        $grant['solid_refresh_token_expiry'] = time() + $json['refresh_expires_in'];
+                    }
+
                     $this->solidClient->persistGrantForWebId($json['webId'], $grant);
 
                     $this->createContainer($json['storageUrl'], $json['webId']);
@@ -147,4 +151,3 @@ class PodCreationController extends ApiController
         return $response;
     }
 }
-

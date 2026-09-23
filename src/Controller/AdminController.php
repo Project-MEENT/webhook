@@ -173,7 +173,11 @@ HTML;
         }
 
         // Proceed with Solid authentication
-        $redirectUri = $this->solidClient->connectWebId($requestedWebId, $this->session);
+        try {
+            $redirectUri = $this->solidClient->connectWebId($requestedWebId, $this->session);
+        } catch (\Throwable $exception) {
+            return $this->errorResponse->badGateway("Could not connect WebID '$requestedWebId'");
+        }
 
         if (empty($redirectUri)) {
             // @TODO: Check or change the title/pointer inconsistency.

@@ -23,6 +23,7 @@ use Psr\Http\Message\ResponseInterface;
 
 class SolidClient
 {
+    private const REFRESH_TOKEN_TTL = 30 * 24 * 3600;
     ////////////////////////////// CLASS PROPERTIES \\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     use UrlHashTrait;
@@ -755,15 +756,7 @@ class SolidClient
                 $tokenSet = $this->authorizationService->refresh($oidcClient, $storedRefreshToken);
                 // Refresh token exchange succeeded; offline consent is being reused.
             } catch (\Facile\OpenIDClient\Exception\ExceptionInterface $e) {
-                // @KLUDGE: Stored offline grant could not be refreshed (see $e->getMessage()) we can not fall back to interactive login
-                //          Remove the stored grants before error out.
-                $offlineGrantFile = $this->getGrantFilePath($issuer, $webIdUrl);
-
-                if ($this->filesystem->fileExists($offlineGrantFile)) {
-                    $this->filesystem->delete($offlineGrantFile);
-                }
-
-                throw SolidException::create('Stored offline grant could not be refreshed. Reconnect WebID to renew consent.', $e);
+                throw SolidException::create('Stored offline grant could not be refreshed: ' . $e->getMessage(), $e);
             }
 
             $idToken = $tokenSet->getIdToken();
@@ -787,6 +780,9 @@ class SolidClient
 
             $grant['solid_access_token'] = $accessToken;
             $grant['solid_refresh_token'] = $tokenSet->getRefreshToken() ?: $storedRefreshToken;
+            if (is_string($grant['solid_refresh_token']) && $grant['solid_refresh_token'] !== '') {
+                $grant['solid_refresh_token_expiry'] = time() + self::REFRESH_TOKEN_TTL;
+            }
             $grant['solid_token_expiry'] = $expiresIn > 0 ? time() + $expiresIn : time() + 3600;
 
             $this->saveOfflineGrant($issuer, $webIdUrl, $grant);

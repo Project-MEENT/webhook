@@ -106,6 +106,7 @@ class ApiController extends AbstractController
                     $this->config,
                 );
                 $controller->setAdminSession($this->adminSession);
+                $controller->setHttpClient($this->httpClient);
             break;
 
             case self::SUBJECT_POD_CREATION:

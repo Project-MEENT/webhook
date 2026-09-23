@@ -94,13 +94,8 @@ class DataController extends ApiController
     {
         return function () use ($turtle, $url, $webIdUrl, $filePath) {
             try {
-                $response = $this->solidClient->storeResource(
-                    $webIdUrl,
-                    $url,
-                    $turtle,
-                    'text/turtle'
-                );
-            } catch (SolidException $e) {
+                $response = $this->storeResource($webIdUrl, $url, $turtle);
+            } catch (\Throwable $e) {
                 $message = vsprintf(self::ERROR_COULD_NOT_WRITE_TO_POD, [
                     'resource' => $url,
                     'error' => $e->getMessage(),
@@ -342,7 +337,7 @@ class DataController extends ApiController
                             ];
                         } else {
                             try {
-                                $this->solidClient->storeResource($webIdUrl, $url, $turtle, 'text/turtle');
+                                $this->storeResource($webIdUrl, $url, $turtle);
                             } catch (SolidException $e) {
                                 return $this->errorResponse->badGateway('Solid write error', 'Could not write resource to Solid Pod: ' . $e->getMessage());
                             }
@@ -386,5 +381,45 @@ class DataController extends ApiController
         }
 
         return $response;
+    }
+
+    private function storeResource(string $webIdUrl, string $url, mixed $turtle)
+    {
+        try {
+            return $this->solidClient->storeResource($webIdUrl, $url, $turtle, 'text/turtle');
+        } catch (SolidException $e) {
+            if (! isset($this->httpClient)) {
+                throw $e;
+            }
+
+            // Try to recover authentication
+
+            $response = $this->httpClient->request('POST', '', [
+                'form_params' => [
+                    'client_id' => $this->solidClient->getClientId(),
+                    'web_id' => $webIdUrl,
+                ],
+            ]);
+            $grant = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
+
+            if (! is_array($grant) || empty($grant['access_token']) || empty($grant['refresh_token'])) {
+                throw RuntimeException::create('Recovery response did not contain usable token(s).', $e);
+            }
+
+            $recoveredGrant = [
+                'solid_access_token' => $grant['access_token'],
+                'solid_refresh_token' => $grant['refresh_token'],
+                'solid_token_expiry' => time() + ($grant['expires_in'] ?? 3600),
+                'solid_webid' => $grant['webId'] ?? $webIdUrl,
+            ];
+
+            if (isset($grant['refresh_expires_in'])) {
+                $recoveredGrant['solid_refresh_token_expiry'] = time() + $grant['refresh_expires_in'];
+            }
+
+            $this->solidClient->persistGrantForWebId($webIdUrl, $recoveredGrant);
+
+            return $this->solidClient->storeResource($webIdUrl, $url, $turtle, 'text/turtle');
+        }
     }
 }
