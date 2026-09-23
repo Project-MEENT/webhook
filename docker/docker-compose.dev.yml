@@ -1,0 +1,33 @@
+---
+services:
+  webhook:
+    command: >
+      sh -c '
+        echo "MEENT Webhook running on: http://$(tail -n1 /etc/hosts | cut -f1)";
+        chown -R www-data:www-data /app/data/;
+        docker-php-entrypoint apache2-foreground;
+      '
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer/
+      COMPOSER_HOME: /tmp
+      ACCEPT_LOCALHOST_DOMAIN: true
+    hostname: webhook.localhost
+    image: ghcr.io/project-meent/webhook:v0.5.5
+    networks: [ webhook ]
+    volumes:
+      - ../config.php.example:/app/config.php
+      - ../build/api:/app/data/api
+      - ../build/solid-client:/app/data/solid-client
+      # - ../docker/site.conf:/etc/apache2/sites-enabled/000-default.conf
+      - ../README.md /app/README.md
+      - ../docs /app/docs
+      - ../src /app/src/
+      - ../vendor /app/vendor
+      - ../web /app/web/
+      # To cache composer file on the host, uncomment the lines below
+      # - ~/.cache/composer:/tmp/composer/cache
+      # - ~/.config/composer:/tmp/composer
+
+networks:
+  webhook:
+    driver: bridge

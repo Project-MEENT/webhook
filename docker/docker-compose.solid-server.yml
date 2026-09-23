@@ -1,0 +1,67 @@
+---
+services:
+  solid:
+    command: >
+      sh -c '
+        if [ ! -f /app/data/solid-server/keys/encryption.key ]; then
+          echo "Running server init script...";
+          mkdir -p /app/data/solid-server/db \
+              /app/data/solid-server/keys \
+              /app/data/solid-server/pods \
+              /app/data/solid-server/profiles;
+          cd /opt/solid/; php init.php; cd -;
+        fi;
+        chown -R www-data:www-data /app/data/solid-server;
+        docker-php-entrypoint apache2-foreground;
+      '
+    hostname: solid.localhost
+    image: ghcr.io/pdsinterop/multiuser-php-solid-server:main
+    networks:
+      webhook:
+        aliases:
+          - identity.solid.localhost
+          - idp.solid.localhost
+          - storage.solid.localhost
+    ports:
+      - "443:443"
+    volumes:
+      ##  When also developing the Solid server, the source code can be mounted here
+      # - /path/to/pdsinterop/multiuser-php-solid-server/frontend:/opt/solid/frontend
+      # - /path/to/pdsinterop/multiuser-php-solid-server/lib:/opt/solid/lib
+      # - /path/to/pdsinterop/multiuser-php-solid-server/vendor:/opt/solid/vendor
+      # - /path/to/pdsinterop/multiuser-php-solid-server/www:/opt/solid/www
+      # - /path/to/pdsinterop//multiuser-php-solid-server/init.php:/opt/solid/init.php
+      - ../build/solid-server:/app/data/solid-server
+      - ../docker/solid-server.apache.conf:/etc/apache2/sites-enabled/000-default.conf
+      - ../docker/solid-server.config.php:/opt/solid/config.php
+
+  pubsub:
+    image: ghcr.io/pdsinterop/php-solid-pubsub-server
+    ports:
+      - "8080:8080"
+    expose:
+      - 8080
+    depends_on:
+      - solid
+
+  mailpit:
+    depends_on:
+      - solid
+    image: axllent/mailpit
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: 5000
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    networks:
+      webhook:
+    ports:
+      - "8025:8025"
+      - "2525:1025"
+    restart: unless-stopped
+    volumes:
+      - ../build/solid-server/mailpit-data:/data
+
+networks:
+  webhook:
+    driver: bridge
