@@ -8,6 +8,7 @@ use Meent\WebHook\Config;
 use Meent\WebHook\Controller\Api\ConsentController;
 use Meent\WebHook\Controller\Api\DataController;
 use Meent\WebHook\Controller\Api\PodCreationController;
+use Meent\WebHook\Controller\Api\RecoveryController;
 use Meent\WebHook\Controller\Api\RegisterController;
 use Meent\WebHook\ErrorResponse;
 use Meent\WebHook\Exception;
@@ -28,6 +29,7 @@ class ApiController extends AbstractController
         self::SUBJECT_CONSENT,
         self::SUBJECT_DATA,
         self::SUBJECT_POD_CREATION,
+        self::SUBJECT_RECOVERY,
         self::SUBJECT_REGISTER,
     ];
 
@@ -42,6 +44,7 @@ class ApiController extends AbstractController
     private const SUBJECT_CONSENT = 'consent';
     private const SUBJECT_DATA = 'data';
     private const SUBJECT_POD_CREATION = 'pod';
+    private const SUBJECT_RECOVERY = 'recovery';
     private const SUBJECT_REGISTER = 'register';
 
     protected AdminSession $adminSession;
@@ -107,6 +110,20 @@ class ApiController extends AbstractController
                 );
                 $controller->setAdminSession($this->adminSession);
                 $controller->setHttpClient($this->httpClient);
+            break;
+
+            case self::SUBJECT_RECOVERY:
+                if ($version >= 0.5 && isset($this->httpClient)) {
+                    $controller = new RecoveryController(
+                        $this->filesystem,
+                        $this->solidClient,
+                        $this->errorResponse,
+                        $this->config,
+                    );
+                    $controller->setHttpClient($this->httpClient);
+                } else {
+                    $response = $this->handleNotFound($request);
+                }
             break;
 
             case self::SUBJECT_POD_CREATION:
