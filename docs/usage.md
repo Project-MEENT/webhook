@@ -39,6 +39,27 @@ For manually created Pods, this can be done by filling the WebID URL into the P1
 
 With the WebID URL, the dongle can request an API key from the Webhook using [the registration endpoint](/api/register/).
 
+For API v0.5 (the default), send the WebID as a `text/plain` request body and the
+associated device secret in `X-Client-Secret`. Registration looks up the MAC for
+that exact WebID and verifies its stored secret. Different devices may share a
+secret; each keeps its own WebID and API key.
+
+Repeating pod creation with the same MAC and secret returns the existing WebID.
+Repeating registration returns the same API key with status `200`; the first
+registration returns `201`. Authentication errors never issue keys.
+
+On successful registration, older duplicate API keys for that WebID are
+consolidated: the lexicographically first key is retained and the others are
+removed. Devices using a removed key must register again to retrieve the retained
+key. This cleanup happens when the device next registers; deployment alone does
+not clean existing storage. API v0.3/v0.4 retain their existing `409` response for
+an already registered WebID.
+
+Pod creation and registration assume at most one active request per MAC.
+Existing MAC spelling and WebID values must be supplied unchanged. Registration
+still scans the shared key directory, so duplicate cleanup by another device can
+race with that scan; a MAC-specific lookup is deferred.
+
 ## Write Data
 
 With the API key, the dongle can send data to the Webhook using [the data endpoint](/api/data/).

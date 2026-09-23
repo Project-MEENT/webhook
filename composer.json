@@ -27,5 +27,8 @@
     },
     "require-dev": {
     },
+    "scripts": {
+        "test": "php tests/registration.php"
+    },
     "type": "project"
 }

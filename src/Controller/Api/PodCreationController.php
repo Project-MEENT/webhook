@@ -74,20 +74,20 @@ class PodCreationController extends ApiController
         $secret = $request->getHeaderLine('X-Client-Secret');
         $secretHash = hash_hmac('sha256', $secret, '', true);
 
+        if ($mac === '') {
+            return $this->errorResponse->unprocessableEntity('No data received', 'No data received');
+        }
+        if ($secret === '') {
+            return $this->errorResponse->unauthorized('Missing secret header', 'X-Client-Secret header is missing (or empty)');
+        }
+
         $secretExists = $this->filesystem->fileExists('keys/' . $mac . '.secret');
         $macExists = $this->filesystem->fileExists('keys/' . $mac . '.mac');
 
-        if (empty($mac)) {
-            $response = $this->errorResponse->unprocessableEntity('No data received', 'No data received');
-        // @TODO: Check what the MAC format is we receive. If it matches PHP's filter_var, then we can use it.'
-        // } elseif (filter_var($mac, FILTER_VALIDATE_MAC) === false) {
-        //     $response = $this->errorResponse->unprocessableEntity('Invalid MAC', "Provided MAC Address '$mac' is not valid");
-        } elseif (empty($secret)) {
-            $response = $this->errorResponse->unauthorized('Missing secret header', 'X-Client-Secret header is missing (or empty)');
-        } elseif ($macExists) {
+        if ($macExists) {
             if(! $secretExists) {
                 $response = $this->errorResponse->notFound('Could not find secret for given MAC', "The provided MAC Address '$mac' has already been registered, but no secret is present");
-            } elseif ($this->filesystem->read('keys/' . $mac . '.secret') !== $secretHash) {
+            } elseif (! hash_equals($this->filesystem->read('keys/' . $mac . '.secret'), $secretHash)) {
                 $response = $this->errorResponse->forbidden('Invalid secret', "Provided secret is not valid for given MAC '$mac'");
             } else {
                 $webId = $this->filesystem->read('keys/' . $mac . '.mac');

@@ -74,81 +74,80 @@ class RegisterController extends ApiController
 
     private function handleRegisterPost(ServerRequestInterface $request): array
     {
-        $input = $request->getBody()->getContents();
+        $webId = trim($request->getBody()->getContents());
         $version = $this->getRequestedVersion($request);
 
-        $webId = trim($input);
+        if ($webId === '') {
+            return $this->errorResponse->unprocessableEntity('No data received', 'No data received');
+        }
+        if (filter_var($webId, FILTER_VALIDATE_URL) === false) {
+            return $this->errorResponse->unprocessableEntity('Invalid URL', "Provided WebID '$webId' is not a valid URL");
+        }
 
         $webIdHash = $this->hashUrl($webId, 'sha1');
         $webIdExists = $this->filesystem->directoryExists($webIdHash);
-
-        if (empty($webId)) {
-            $response = $this->errorResponse->unprocessableEntity('No data received', 'No data received');
-        } elseif (filter_var($webId, FILTER_VALIDATE_URL) === false) {
-            $response = $this->errorResponse->unprocessableEntity('Invalid URL', "Provided WebID '$webId' is not a valid URL");
-        } else {
-            if ($webIdExists && $version <= 0.4) {
-                $response = $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered");
-            } else {
-                $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
-
-                $isConnected = true;
-                if ($version >= 0.5) {
-                    // @FIXME: How can we check whether we ARE a trusted client?
-                    //         Is it enought to check if there is a *.mac file with the webid in it?
-                    //         Or should we create a webid-hash.mac file with the MAC in it (and check that)?
-                    // If we are a trusted client, we are always "connected"
-                    $secret = $request->getHeaderLine('X-Client-Secret');
-                    $secretHash = hash_hmac('sha256', $secret, '', true);
-
-                    if (empty($secret)) {
-                        $response = $this->errorResponse->unauthorized('Missing secret header', 'X-Client-Secret header is missing (or empty)');
-                    } else{
-                        $macInformation = new MacInformation($this->filesystem);
-                        $mac = $macInformation->getMacForSecretHash($secretHash);
-
-                        if (! $mac) {
-                            $response = $this->errorResponse->notFound('Could not find MAC for given secret');
-                        } elseif (! $this->filesystem->fileExists('keys/' . $mac . '.mac')) {
-                            $response = $this->errorResponse->notFound('Could not find WebID for given MAC', "The provided MAC Address '$mac' has already been registered, but no WebID is present");
-                        } elseif ($this->filesystem->read('keys/' . $mac . '.secret') !== $secretHash) {
-                            $response = $this->errorResponse->forbidden('Invalid secret', "Provided secret is not valid for given MAC '$mac'");
-                        } else {
-                            $webId = $this->filesystem->read('keys/' . $mac . '.mac');
-                        }
-                    }
-                } elseif ($version >= 0.4) {
-                    $isConnected = $this->solidClient->isWebIdConnected($webId);
-
-                    if (! $isConnected) {
-                        $connectionUrl = $this->getBaseUrl() . '/api/consent?webid=' . urlencode($webId);
-                        $response = $this->errorResponse->proxyAuthenticationRequired('WebID Authentication Required', "The provided WebID '$webId' is not yet connected. To connect this WebID, visit: $connectionUrl", '#webid-not-connected');
-                        // @CHECKME: Add Location header?
-                        // $response['headers']['Location'] = [$connectionUrl];
-                    }
-                }
-
-                if ($isConnected === true) {
-                    $this->filesystem->write('keys/' . $apiKey . '.key', $webId);
-                    if ($this->filesystem->directoryExists($webIdHash)) {
-                        $response = [
-                            'content' => ['api_key' => $apiKey, 'webid' => $webId],
-                            'status' => 200,
-                            'title' => 'WebID already registered',
-                        ];
-                    } else {
-                        $this->filesystem->createDirectory($webIdHash);
-
-                        $response = [
-                            'content' => ['api_key' => $apiKey, 'webid' => $webId],
-                            'status' => 201,
-                            'title' => 'WebID registered',
-                        ];
-                    }
-                }
-            }
+        if ($webIdExists && $version <= 0.4) {
+            return $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered");
         }
 
-        return $response;
+        if ($version >= 0.5) {
+            $secret = $request->getHeaderLine('X-Client-Secret');
+            if ($secret === '') {
+                return $this->errorResponse->unauthorized('Missing secret header', 'X-Client-Secret header is missing (or empty)');
+            }
+
+            $macs = (new MacInformation($this->filesystem))->getMacsForWebId($webId);
+            if ($macs === []) {
+                return $this->errorResponse->notFound('Could not find MAC for given WebID');
+            }
+            if (count($macs) !== 1) {
+                return $this->errorResponse->conflict('Multiple MAC addresses for given WebID');
+            }
+
+            $secretPath = 'keys/' . $macs[0] . '.secret';
+            if (! $this->filesystem->fileExists($secretPath)) {
+                return $this->errorResponse->notFound('Could not find secret for given MAC');
+            }
+            $secretHash = hash_hmac('sha256', $secret, '', true);
+            if (! hash_equals($this->filesystem->read($secretPath), $secretHash)) {
+                return $this->errorResponse->forbidden('Invalid secret', 'Provided secret is not valid for given WebID');
+            }
+        } elseif ($version >= 0.4 && ! $this->solidClient->isWebIdConnected($webId)) {
+            $connectionUrl = $this->getBaseUrl() . '/api/consent?webid=' . urlencode($webId);
+            return $this->errorResponse->proxyAuthenticationRequired('WebID Authentication Required', "The provided WebID '$webId' is not yet connected. To connect this WebID, visit: $connectionUrl", '#webid-not-connected');
+        }
+
+        // Authentication has succeeded. Reuse one key and consolidate legacy duplicates.
+        $apiKeys = [];
+        foreach ($this->filesystem->listContents('keys') as $file) {
+            $path = $file->path();
+            if ($file->isFile() && str_ends_with($path, '.key')
+                && $this->filesystem->read($path) === $webId
+            ) {
+                $apiKeys[] = basename($path, '.key');
+            }
+        }
+        sort($apiKeys, SORT_STRING);
+        $alreadyRegistered = $webIdExists || $apiKeys !== [];
+        $apiKey = array_shift($apiKeys);
+
+        if ($apiKey === null) {
+            do {
+                $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
+            } while ($this->filesystem->fileExists('keys/' . $apiKey . '.key'));
+            $this->filesystem->write('keys/' . $apiKey . '.key', $webId);
+        }
+        foreach ($apiKeys as $duplicate) {
+            $this->filesystem->delete('keys/' . $duplicate . '.key');
+        }
+        if (! $webIdExists) {
+            $this->filesystem->createDirectory($webIdHash);
+        }
+
+        return [
+            'content' => ['api_key' => $apiKey, 'webid' => $webId],
+            'status' => $alreadyRegistered ? 200 : 201,
+            'title' => $alreadyRegistered ? 'WebID already registered' : 'WebID registered',
+        ];
     }
 }
