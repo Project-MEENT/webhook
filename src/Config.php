@@ -14,6 +14,7 @@ class Config extends AbstractConfig
     final public const BASE_URL = 'base_url';
     final public const CLIENT_NAME = 'client_name';
     final public const JWT_TTL = 'jwt_ttl';
+    final public const LOG_LEVEL = 'log_level';
     final public const METADATA_CACHE_TTL = 'metadata_cache_ttl';
     final public const POD_CREATION_KEY = 'pod_creation_key';
     final public const POD_CREATION_URL = 'pod_creation_url';
@@ -39,6 +40,7 @@ class Config extends AbstractConfig
     final protected function getOptionalKeys(): array
     {
         return [
+            self::LOG_LEVEL => 'RFC 5424 compliant log level (optional)',
             self::POD_CREATION_KEY => 'Secret key used to create Solid Pods (optional, only needed when automatic Pod creation is needed)',
             self::POD_CREATION_URL => 'URL where Solid Pod can be created (optional, only needed when automatic Pod creation is needed)',
             OidcClientConfig::INITIAL_ACCESS_TOKEN => 'Initial Access Token for dynamic client registration (optional, only needed if the OP requires it)',

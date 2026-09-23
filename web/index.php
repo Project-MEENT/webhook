@@ -59,7 +59,7 @@ $clientFilesystem = new Filesystem($clientFilesystemAdapter);
 // Create PSR Request and Response objects
 $request = ServerRequestFactory::fromGlobals($_SERVER, $_GET, $_POST, $_COOKIE, $_FILES);
 
-$errorResponse = new ErrorResponse();
+$errorResponse = new ErrorResponse($config->get(Config::LOG_LEVEL) ?? 500);
 
 $session = Session::current();
 $adminSession = new AdminSession($session, $config->get(Config::ADMIN_WEBIDS));

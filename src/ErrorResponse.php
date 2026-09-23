@@ -5,6 +5,7 @@ namespace Meent\WebHook;
 class ErrorResponse
 {
     //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+    final public function __construct(private $logLevel) {}
 
     final public function badGateway($title, $detail = null, $pointer = null): array
     {
@@ -78,6 +79,19 @@ class ErrorResponse
         int $status,
         ?string $pointer = null,
     ): array {
+        /* RFC 5424 Log Levels
+         *  - Debug     : 100
+         *  - Info      : 200
+         *  - Notice    : 250
+         *  - Warning   : 300
+         *  - Error     : 400
+         *  - Critical  : 500
+         *  - Alert     : 550
+         *  - Emergency : 600
+         */
+        if ($this->logLevel <= 400) {
+            error_log("Handled error: ($status) $title: $detail");
+        }
         return [
             'content' => [[
                 'detail' => $detail,
