@@ -12,6 +12,25 @@ class MacInformation
         private FilesystemOperator $dataFilesystem,
     ) {}
 
+    final public function getMacsForWebId(string $webId): array
+    {
+        $macs = [];
+
+        $generator = $this->dataFilesystem->listContents('keys')->toArray();
+
+        array_walk($generator, function ($fileAttribute) use (&$macs, $webId) {
+            $path = $fileAttribute->path();
+
+            if ($fileAttribute->isFile() && str_ends_with($path, '.mac')
+                && $this->dataFilesystem->read($path) === $webId
+            ) {
+                $macs[] = basename($path, '.mac');
+            }
+        });
+
+        return $macs;
+    }
+
     final public function getMacForSecretHash(string $secretHash): string
     {
         $mac = '';

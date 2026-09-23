@@ -79,20 +79,19 @@ class RegisterController extends ApiController
 
         $webId = trim($input);
 
-        $webIdHash = $this->hashUrl($webId, 'sha1');
-        $webIdExists = $this->filesystem->directoryExists($webIdHash);
-
         if (empty($webId)) {
             $response = $this->errorResponse->unprocessableEntity('No data received', 'No data received');
         } elseif (filter_var($webId, FILTER_VALIDATE_URL) === false) {
             $response = $this->errorResponse->unprocessableEntity('Invalid URL', "Provided WebID '$webId' is not a valid URL");
         } else {
+            $webIdHash = $this->hashUrl($webId, 'sha1');
+            $webIdExists = $this->filesystem->directoryExists($webIdHash);
+
             if ($webIdExists && $version <= 0.4) {
                 $response = $this->errorResponse->conflict('WebID already registered', "The provided WebID '$webId' has already been registered");
             } else {
                 $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
 
-                $isConnected = true;
                 if ($version >= 0.5) {
                     // @FIXME: How can we check whether we ARE a trusted client?
                     //         Is it enought to check if there is a *.mac file with the webid in it?
@@ -105,16 +104,16 @@ class RegisterController extends ApiController
                         $response = $this->errorResponse->unauthorized('Missing secret header', 'X-Client-Secret header is missing (or empty)');
                     } else{
                         $macInformation = new MacInformation($this->filesystem);
-                        $mac = $macInformation->getMacForSecretHash($secretHash);
+                        $macs = $macInformation->getMacsForWebId($webId);
 
-                        if (! $mac) {
-                            $response = $this->errorResponse->notFound('Could not find MAC for given secret');
-                        } elseif (! $this->filesystem->fileExists('keys/' . $mac . '.mac')) {
-                            $response = $this->errorResponse->notFound('Could not find WebID for given MAC', "The provided MAC Address '$mac' has already been registered, but no WebID is present");
-                        } elseif ($this->filesystem->read('keys/' . $mac . '.secret') !== $secretHash) {
-                            $response = $this->errorResponse->forbidden('Invalid secret', "Provided secret is not valid for given MAC '$mac'");
-                        } else {
-                            $webId = $this->filesystem->read('keys/' . $mac . '.mac');
+                        if ($macs === []) {
+                            $response = $this->errorResponse->notFound("Could not find MAC for given WebID '$webId'");
+                        } elseif (count($macs) !== 1) {
+                            return $this->errorResponse->conflict('Multiple MAC addresses for given WebID');
+                        } elseif (! $this->filesystem->fileExists('keys/' . $macs[0] . '.secret')) {
+                            $response = $this->errorResponse->notFound("Could not find secret for given MAC '$macs[0]'");
+                        } elseif ($this->filesystem->read('keys/' . $macs[0] . '.secret') !== $secretHash) { // @TODO: Use hash_equals() for secret comparison
+                            $response = $this->errorResponse->forbidden('Invalid secret', "Provided secret is not valid for given WebID '$webId'");
                         }
                     }
                 } elseif ($version >= 0.4) {
@@ -128,17 +127,47 @@ class RegisterController extends ApiController
                     }
                 }
 
-                if ($isConnected === true) {
-                    $this->filesystem->write('keys/' . $apiKey . '.key', $webId);
-                    if ($this->filesystem->directoryExists($webIdHash)) {
+                if (! isset($response)) {
+                    // Authentication has succeeded. Reuse one key and consolidate legacy duplicates.
+                    // @TODO: This should live in MacInformation class
+                    $apiKeys = [];
+                    foreach ($this->filesystem->listContents('keys') as $file) {
+                        $path = $file->path();
+                        if ($file->isFile() && str_ends_with($path, '.key')
+                            && $this->filesystem->read($path) === $webId
+                        ) {
+                            $apiKeys[] = basename($path, '.key');
+                        }
+                    }
+
+                    sort($apiKeys, SORT_STRING);
+                    $alreadyRegistered = $webIdExists || $apiKeys !== [];
+                    $apiKey = array_shift($apiKeys);
+
+                    if ($apiKey === null) {
+                        // Avoid accidental key collision
+                        do {
+                            $apiKey = rtrim(strtr(base64_encode(random_bytes(24)), '+/', '-_'), '=');
+                        } while ($this->filesystem->fileExists('keys/' . $apiKey . '.key'));
+
+                        $this->filesystem->write('keys/' . $apiKey . '.key', $webId);
+                    }
+
+                    foreach ($apiKeys as $duplicate) {
+                        $this->filesystem->delete('keys/' . $duplicate . '.key');
+                    }
+
+                    if (! $webIdExists) {
+                        $this->filesystem->createDirectory($webIdHash);
+                    }
+
+                    if ($alreadyRegistered) {
                         $response = [
                             'content' => ['api_key' => $apiKey, 'webid' => $webId],
                             'status' => 200,
                             'title' => 'WebID already registered',
                         ];
                     } else {
-                        $this->filesystem->createDirectory($webIdHash);
-
                         $response = [
                             'content' => ['api_key' => $apiKey, 'webid' => $webId],
                             'status' => 201,
