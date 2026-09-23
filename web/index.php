@@ -213,7 +213,11 @@ switch ($rootPath) {
 
         $solidClientFactory = new SolidClientFactory($config, $clientFilesystem, $oidcClientConfig);
         $solidClient = $solidClientFactory->create($solidClientConfig, $httpClientConfig);
-        $webIdInformationService = new WebIdInformation($clientFilesystem, $dataFilesystem);
+        $webIdInformationService = new WebIdInformation(
+            $clientFilesystem,
+            $dataFilesystem,
+            new MacInformation($dataFilesystem),
+        );
 
         $controller = new AdminController(
             $solidClient,

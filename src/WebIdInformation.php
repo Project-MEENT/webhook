@@ -11,18 +11,13 @@ class WebIdInformation
 
     use UrlHashTrait;
 
-    private FilesystemOperator $clientFilesystem;
-    private FilesystemOperator $dataFilesystem;
-
     //////////////////////////////// PUBLIC API \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     final public function __construct(
-        FilesystemOperator $clientFilesystem,
-        FilesystemOperator $dataFilesystem,
-    ) {
-        $this->clientFilesystem = $clientFilesystem;
-        $this->dataFilesystem = $dataFilesystem;
-    }
+        private FilesystemOperator $clientFilesystem,
+        private FilesystemOperator $dataFilesystem,
+        private MacInformation $macInformation,
+    ) {}
 
     final public function getAll(): array
     {
@@ -37,16 +32,41 @@ class WebIdInformation
         sort($webIds);
 
         foreach ($webIds as $webId) {
+            $webId = trim($webId);
+
             $apiKey = array_search($webId, $registeredWebIds, true);
 
             $information[] = [
                 'api_key' => $apiKey,
                 'has_consent' => in_array($webId, $usersWebIds, true),
                 'webid' => $webId,
+                'macs' => $this->macInformation->getMacsForWebId($webId),
+                'pending_files' => $this->macInformation->countPendingFilesForWebId($webId),
+                'storage_url' => $this->macInformation->getStorageUrlForWebId($webId),
             ];
         }
 
         return $information;
+    }
+
+    /**
+     * Total number of pending data files across all WebIDs, including files
+     * for WebIDs that are no longer registered (orphaned data).
+     */
+    final public function getTotalPendingFiles(): int
+    {
+        return $this->macInformation->getTotalPendingFiles();
+    }
+
+    /**
+     * Information about pending data directories that do not belong to any
+     * currently registered WebID ("orphaned" data).
+     *
+     * @return array<int, array{hash: string, storage_url: string, pending_files: int}>
+     */
+    final public function getOrphanedPendingFiles(): array
+    {
+        return $this->macInformation->getOrphanedPendingFiles();
     }
 
     ////////////////////////////// UTILITY METHODS \\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -62,7 +82,7 @@ class WebIdInformation
 
             if ($fileAttribute->isFile() && str_ends_with($path, '.key')) {
                 $webIdUrl = $this->dataFilesystem->read($path);
-                $webId = $this->normalizeUrl($webIdUrl);
+                $webId = $this->normalizeUrl(trim($webIdUrl));
 
                 $apiKey = basename($path, '.key');
 

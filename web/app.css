@@ -98,6 +98,7 @@ form[action$="logout"] {
     width: fit-content;
 }
 
+form[action^="/api/recovery"] button,
 form[action="/admin/manage"] button,
 form[action$="logout"] button {
     margin-left: 1rem;
@@ -105,6 +106,7 @@ form[action$="logout"] button {
 }
 
 
+form[action^="/api/recovery"],
 form[action="/admin/manage"] {
     align-items: center;
     border: none;

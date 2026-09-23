@@ -9,6 +9,9 @@
             <a aria-hidden="true" data-js="show-password" title="Show password">👁️</a>
         </label>
     </td>
+    <td title="MAC address(es) of the P1 dongle(s) connected to this WebID">%7$s</td>
+    <td title="Number of data records not yet written to the Solid Pod">%8$s</td>
+    <td title="Storage URL this WebID writes to">%9$s</td>
     <td>
         <form action="/admin/manage" method="POST">
             <input type="hidden" name="webid" value="%1$s"/>
@@ -16,3 +19,10 @@
             <button type="submit">Update</button>
         </form>
     </td>
+    <td>
+        <form action="/api/recovery/" method="POST" data-js="recover-auth">
+            <input type="hidden" name="webid" value="%1$s"/>
+            <button type="submit" title="Re-issue the offline grant for this WebID via the Solid Pod provider">Recover auth</button>
+        </form>
+    </td>
+</tr>

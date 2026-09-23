@@ -111,6 +111,14 @@ class AdminController extends AbstractController
                 $hasConsent = str_contains($webId, $host) || $hasConsent;
             }
 
+            $macs = $info['macs'] ?? [];
+            $macsLabel = $macs === [] ? '—' : implode(', ', $macs);
+
+            $storageUrl = $info['storage_url'] ?? '';
+            $storageUrlCell = $storageUrl === ''
+                ? '—'
+                : '<a href="' . $storageUrl . '" target="_blank" rel="noopener">📦</a>';
+
             return vsprintf($template, [
                 '%1$s' => $webId,
                 '%2$s' => $webIdHash,
@@ -118,6 +126,9 @@ class AdminController extends AbstractController
                 '%4$s' => $hasConsent ? 'checked ' : '',
                 '%5$s' => $isDongleRegistered ? 'checked ' : '',
                 '%6$s' => $info['api_key'],
+                '%7$s' => $macsLabel,
+                '%8$s' => (string) ($info['pending_files'] ?? 0),
+                '%9$s' => $storageUrlCell,
             ]);
         }, $webIds);
 
@@ -132,7 +143,11 @@ class AdminController extends AbstractController
                     <th>Connected<br>to Pod</th>
                     <th>Dongle<br/>Registered</th>
                     <th>API Key</th>
+                    <th>MAC</th>
+                    <th>Pending<br/>data</th>
+                    <th>Storage URL</th>
                     <th>Admin<br/>Account</th>
+                    <td></td>
                 </tr>
                 </thead>
                 <tbody>$implode</tbody>
@@ -332,15 +347,66 @@ HTML;
                     } else {
                         $webIdsHtml = $this->createInfoTable($webIds);
                     }
+
+                    $pendingFiles = $this->webIdInformation->getTotalPendingFiles();
+                    $pendingSummary = $pendingFiles === 0
+                        ? '<p>All data has been written to the Solid Pods.</p>'
+                        : '<p><strong>' . $pendingFiles . '</strong> data record(s) are still waiting to be written to the Solid Pods (auth failed, network error, etc.).</p>';
+
+                    $orphans = $this->webIdInformation->getOrphanedPendingFiles();
+                    if ($orphans === []) {
+                        $orphansHtml = '';
+                    } else {
+                        $orphansTotal = array_sum(array_column($orphans, 'pending_files'));
+                        $orphansRows = '';
+                        foreach ($orphans as $orphan) {
+                            $orphansRows .= vsprintf(
+                                '<tr>
+                                    <td><code>%1$s</code></td>
+                                    <td><code>%2$s</code></td>
+                                    <td>%3$s</td>
+                                </tr>',
+                                [
+                                    $orphan['hash'],
+                                    $orphan['storage_url'],
+                                    $orphan['pending_files'],
+                                ],
+                            );
+                        }
+
+                        $orphansHtml = vsprintf(
+                            '
+                                <h2>Orphaned data (%1$s record(s) for %2$s pod(s) not linked to a registered WebID)</h2>
+                                <p>These data files are stored locally but cannot be written to a Solid Pod because the WebID they belong to is no longer registered. They will be retried once the WebID is registered again.</p>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>WebID hash</th>
+                                            <th>Storage URL</th>
+                                            <th>Pending data</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>%3$s</tbody>
+                                </table>
+                                ',
+                            [
+                                $orphansTotal,
+                                count($orphans),
+                                $orphansRows,
+                            ],
+                        );
+                    }
+
                     $webIdsHtml = $this->addCsrfToForm($webIdsHtml);
 
                     $content = $this->createContent(
                         'Admin dashboard',
                         $logoutForm,
-                        "<section>$webIdsHtml</section>",
+                        "<section>$pendingSummary</section>$orphansHtml<section>$webIdsHtml</section>",
                         [
                             'forms/admin.js',
                             'forms/check-solid-connection.js',
+                            'forms/recover-auth.js',
                             'forms/show-password.js',
                         ],
                     );
