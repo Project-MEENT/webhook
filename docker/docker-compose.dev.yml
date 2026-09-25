@@ -12,7 +12,7 @@ services:
       COMPOSER_HOME: /tmp
       ACCEPT_LOCALHOST_DOMAIN: true
     hostname: webhook.localhost
-    image: ghcr.io/project-meent/webhook:v0.5.6
+    image: ghcr.io/project-meent/webhook:v0.5.7
     networks: [ webhook ]
     volumes:
       - ../config.php.example:/app/config.php
