@@ -82,8 +82,8 @@ class Config extends AbstractConfig
             $values = $this->toArray();
             $filePath = $this->filepath;
 
-            $backupPath = vsprintf('%s.bak-%s', [
-                $filePath,
+            $backupPath = vsprintf('%s/config.php.bak-%s', [
+                $this->get(self::API_STORAGE_PATH),
                 date('YmdHis'),
             ]);
             $copy = copy($filePath, $backupPath);
